@@ -26,6 +26,8 @@ public class RoomController {
     public ResponseEntity<Map<String, String>> createRoom() {
         // (Trong thực tế có thể muốn kiểm tra xem ID đã tồn tại chưa)
         String newRoomId = UUID.randomUUID().toString().substring(0, 8);
+
+        roomService.createNewRoom(newRoomId);
         
         logger.info("Tạo phòng mới với ID: {}", newRoomId);
 
