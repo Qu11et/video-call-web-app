@@ -46,6 +46,6 @@ public class WebSocketEventListener {
             );
             
             messagingTemplate.convertAndSend("/topic/room/" + roomId, message);
-        }
+        }   
     }
 }
