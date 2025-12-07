@@ -4,7 +4,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
-import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -16,11 +15,22 @@ public class RoomService {
 
     private final Map<String, Set<String>> rooms = new ConcurrentHashMap<>();
     private final Map<String, String> userRoomMap = new ConcurrentHashMap<>();
+    private final Map<String, String> roomTypes = new ConcurrentHashMap<>();
 
-    public void createNewRoom(String roomId) {
+    /**
+     * Tạo phòng mới với loại cụ thể
+     * @param roomId ID phòng
+     * @param type Loại phòng ("P2P" hoặc "GROUP")
+     */
+    public void createNewRoom(String roomId, String type) {
         rooms.put(roomId, ConcurrentHashMap.newKeySet());
-        logger.info("Đã khởi tạo phòng trống với ID: {}", roomId);
+        roomTypes.put(roomId, type); // Lưu loại phòng
+        logger.info("Đã khởi tạo phòng {} với loại: {}", roomId, type);
     }
+
+    public String getRoomType(String roomId) {
+        return roomTypes.get(roomId);
+    }   
 
     public void joinRoom(String roomId, String sessionId) {
         Set<String> participants = rooms.computeIfAbsent(

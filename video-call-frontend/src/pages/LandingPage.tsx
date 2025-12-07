@@ -7,15 +7,20 @@ export default function LandingPage() {
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
 
-  const handleCreateRoom = async () => {
+ const handleCreateRoom = async (type: 'P2P' | 'GROUP') => {
     setIsLoading(true);
-    const newRoomId = await createRoomApi();
+    const newRoomId = await createRoomApi(type); // Gọi API với type
     setIsLoading(false);
 
     if (newRoomId) {
-      navigate(`/room/${newRoomId}`);
+      // Điều hướng dựa trên type
+      if (type === 'P2P') {
+        navigate(`/room/p2p/${newRoomId}`);
+      } else {
+        navigate(`/room/group/${newRoomId}`);
+      }
     } else {
-      alert('Không thể tạo phòng. Vui lòng kiểm tra Backend!');
+      alert('Lỗi kết nối Backend!');
     }
   };
 
@@ -24,60 +29,70 @@ export default function LandingPage() {
       alert('Vui lòng nhập ID phòng');
       return;
     }
-
     setIsLoading(true);
-    const exists = await checkRoomExistsApi(roomId);
+    
+    // Kiểm tra phòng và lấy loại phòng
+    const result = await checkRoomExistsApi(roomId);
     setIsLoading(false);
 
-    if (exists) {
-      navigate(`/room/${roomId}`);
+    if (result.exists) {
+      // Tự động điều hướng đến đúng giao diện dựa trên loại phòng
+      if (result.type === 'GROUP') {
+        navigate(`/room/group/${roomId}`);
+      } else {
+        navigate(`/room/p2p/${roomId}`);
+      }
     } else {
-      alert('Phòng không tồn tại hoặc ID sai!');
+      alert('Phòng không tồn tại!');
     }
   };
 
   return (
-    <div className="landing-container" >
+    <div className="landing-container">
       <div className="landing-card">
         <h1>📹 Video Call App</h1>
-        <p> Kết nối dễ dàng, mọi lúc mọi nơi.</p>
+        <p>Chọn chế độ gọi phù hợp</p>
 
-        {/* --- TÔI ĐÃ GOM NHÓM VÀO ĐÂY --- */}
-        <div className="action-container" >
+        <div className="action-container">
           
+          {/* Nút tạo P2P */}
           <button 
             className="btn-primary" 
-            onClick={handleCreateRoom}
+            onClick={() => handleCreateRoom('P2P')}
             disabled={isLoading}
+            style={{ width: '100%', marginBottom: '10px' }}
           >
-            {isLoading ? 'Đang xử lý...' : 'Tạo cuộc họp mới'}
+            {isLoading ? '...' : '👤 Gọi 1-1 (P2P)'}
           </button>
 
-          {/* Container cho separator + input-group */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', marginTop: '20px' }}>
-            <div className="separator" >
-              hoặc
-            </div>
+          {/* Nút tạo Group (SFU) */}
+          <button 
+            className="btn-secondary" 
+            onClick={() => handleCreateRoom('GROUP')}
+            disabled={isLoading}
+            style={{ width: '100%', borderColor: '#8ab4f8', color: '#8ab4f8' }}
+          >
+            {isLoading ? '...' : '👥 Gọi nhóm (SFU)'}
+          </button>
 
-            <div className="input-group" >
-              <input 
-                type="text" 
-                placeholder="Nhập mã cuộc họp"
-                value={roomId}
-                onChange={(e) => setRoomId(e.target.value)}
-              />
-              <button 
-                className="btn-secondary" 
-                onClick={handleJoinRoom}
-                disabled={isLoading}
-              >
-                Tham gia
-              </button>
-            </div>
+          <div className="separator">hoặc tham gia</div>
+
+          <div className="input-group">
+            <input 
+              type="text" 
+              placeholder="Nhập mã phòng..."
+              value={roomId}
+              onChange={(e) => setRoomId(e.target.value)}
+            />
+            <button 
+              className="btn-secondary" 
+              onClick={handleJoinRoom}
+              disabled={isLoading}
+            >
+              Vào
+            </button>
           </div>
-          
         </div>
-        {/* --- HẾT PHẦN GOM NHÓM --- */}
       </div>
     </div>
   );
