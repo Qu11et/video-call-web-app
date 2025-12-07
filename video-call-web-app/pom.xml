@@ -54,6 +54,18 @@
 			<artifactId>spring-boot-starter-test</artifactId>
 			<scope>test</scope>
 		</dependency>
+		<dependency>
+			<groupId>io.livekit</groupId>
+			<artifactId>livekit-server</artifactId>
+			<version>0.8.2</version> <!-- Hoặc phiên bản mới nhất -->
+		</dependency>
+		<!-- Nếu không tìm thấy artifact trên, hãy dùng Retrofit hoặc tự build JWT -->
+		<!-- Cách đơn giản nhất cho Java là dùng thư viện tạo JWT token, vì LiveKit dùng chuẩn JWT -->
+		<dependency>
+			<groupId>com.auth0</groupId>
+			<artifactId>java-jwt</artifactId>
+			<version>4.4.0</version>
+		</dependency>
 	</dependencies>
 
 	<build>
