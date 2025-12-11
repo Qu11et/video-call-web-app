@@ -1,4 +1,4 @@
-const API_BASE_URL = "http://localhost:8080/api/rooms";
+const API_BASE_URL = "/api/rooms";
 
 export const createRoomApi = async (type: 'P2P' | 'GROUP' = 'P2P'): Promise<string | null> => {
   try {
