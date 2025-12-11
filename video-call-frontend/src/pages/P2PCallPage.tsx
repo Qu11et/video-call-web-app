@@ -12,7 +12,12 @@ interface SignalMessage {
   data?: any;
 }
 
-// Cấu hình STUN Server (QUAN TRỌNG ĐỂ KẾT NỐI P2P)
+interface ToastMessage {
+  id: number;
+  message: string;
+  type: 'info' | 'success' | 'error' | 'warning';
+}
+
 const rtcConfig = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
@@ -20,7 +25,7 @@ const rtcConfig = {
   ]
 };
 
-export default function RoomPage() {
+export default function P2PCallPage() {
   const { roomId } = useParams();
   const navigate = useNavigate();
 
@@ -39,46 +44,28 @@ export default function RoomPage() {
   const stompClientRef = useRef<Client | null>(null);
   const started = useRef(false);
   
-  // Lưu Session ID của mình
   const mySessionId = useRef(Math.random().toString(36).substring(7));
 
-  // 1. State quản lý trạng thái kết nối WebSocket
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'reconnecting' | 'disconnected'>('disconnected');
-
-  // 2. State quản lý danh sách thông báo (Toasts)
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
-  // Helper: Hàm thêm thông báo (tự động biến mất sau 3s)
   const addToast = (message: string, type: 'info' | 'success' | 'error' | 'warning' = 'info') => {
     const id = Date.now();
     setToasts(prev => [...prev, { id, message, type }]);
     setTimeout(() => {
       setToasts(prev => prev.filter(t => t.id !== id));
-    }, 3000); // 3 giây
+    }, 3000);
   };
 
-  interface ToastMessage {
-    id: number;
-    message: string;
-    type: 'info' | 'success' | 'error' | 'warning';
-  }
-  
-  // --- HÀM DỌN DẸP KẾT NỐI (FIX LỖI ĐÔNG CỨNG HÌNH) ---
   const cleanupRemoteConnection = () => {
     console.log("🧹 Dọn dẹp kết nối remote...");
-    
-    // 1. Xóa hình ảnh trên thẻ video ngay lập tức
     if (remoteVideoRef.current) {
       remoteVideoRef.current.srcObject = null;
     }
-
-    // 2. Reset State về ban đầu
     setRemoteStream(null);
     setIsRemoteConnected(false);
     setRemoteParticipantName('');
     setParticipantCount(1);
-
-    // 3. Hủy Peer Connection
     if (peerRef.current) {
       peerRef.current.destroy();
       peerRef.current = null;
@@ -94,7 +81,6 @@ export default function RoomPage() {
         const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
         setLocalStream(stream);
         if (localVideoRef.current) localVideoRef.current.srcObject = stream;
-
         connectToWebSocket(stream);
       } catch (error) {
         console.error("Lỗi:", error);
@@ -112,23 +98,30 @@ export default function RoomPage() {
   }, []);
 
   const connectToWebSocket = (stream: MediaStream) => {
-
-    // Cập nhật trạng thái UI
     setConnectionStatus('reconnecting');
     addToast("Đang kết nối đến máy chủ...", "info");
 
-    const socket = new SockJS('http://localhost:8080/ws');
+    // --- LOGIC CHỌN URL THÔNG MINH ---
+    // 1. Nếu chạy Localhost: Dùng cứng cổng 8080 (vì không có Nginx proxy ở local dev)
+    // 2. Nếu chạy VPS (Production): Dùng đường dẫn tương đối '/ws'. 
+    //    Nginx (ở cổng 80) sẽ tự động nhận request '/ws' và chuyển tiếp sang Backend (8080).
+    
+    const socketUrl = window.location.hostname === 'localhost' 
+        ? 'http://localhost:8080/ws' 
+        : '/ws';
+
+    console.log("Connecting to WebSocket at:", socketUrl);
+
+    const socket = new SockJS(socketUrl);
     const client = new Client({
       webSocketFactory: () => socket,
-
-      // --- CẤU HÌNH RECONNECT & HEARTBEAT ---
-      reconnectDelay: 5000, // Tự động thử kết nối lại sau 5s nếu mất mạng
-      heartbeatIncoming: 4000, // Kiểm tra kết nối mỗi 4s
+      reconnectDelay: 5000,
+      heartbeatIncoming: 4000,
       heartbeatOutgoing: 4000,
 
       onConnect: () => {
         console.log(`--> Đã kết nối WS! ID của tôi: ${mySessionId.current}`);
-        setConnectionStatus('connected'); // Cập nhật trạng thái Xanh
+        setConnectionStatus('connected');
         addToast("Kết nối thành công!", "success");
         
         client.subscribe(`/topic/room/${roomId}`, (message) => {
@@ -136,24 +129,19 @@ export default function RoomPage() {
           handleSignalingData(payload, stream);
         });
 
-        // --- SỬA ĐỔI TẠI ĐÂY: Thêm myID vào body ---
         client.publish({
           destination: '/app/join',
           body: JSON.stringify({ 
             roomId: roomId, 
-            myID: mySessionId.current // <--- QUAN TRỌNG
+            myID: mySessionId.current 
           }),
-          // Headers có thể bỏ hoặc giữ cũng được
         });
       },
 
-      // Xử lý khi mất kết nối WebSocket
       onWebSocketClose: () => {
         console.warn("Mất kết nối WebSocket!");
         setConnectionStatus('disconnected');
         addToast("Mất kết nối! Đang thử lại...", "error");
-
-        // ✅ THÊM: Dọn dẹp khi mất kết nối WS
         cleanupRemoteConnection();
       },
 
@@ -167,19 +155,15 @@ export default function RoomPage() {
   };
 
   const handleSignalingData = (payload: SignalMessage, stream: MediaStream) => {
-    // ❌ BỎ DÒNG NÀY - Đang làm bỏ qua user-left
-  // if (payload.senderSessionId === mySessionId.current || payload.sessionId === mySessionId.current) return;
-
-  // ✅ CHỈ BỎ QUA KHI LÀ MESSAGE TỪ CHÍNH MÌNH (trừ user-left)
-  if (payload.type !== 'user-left') {
-    if (payload.senderSessionId === mySessionId.current || payload.sessionId === mySessionId.current) return;
-    if (payload.targetSessionId && payload.targetSessionId !== mySessionId.current) return;
-  }
+    if (payload.type !== 'user-left') {
+      if (payload.senderSessionId === mySessionId.current || payload.sessionId === mySessionId.current) return;
+      if (payload.targetSessionId && payload.targetSessionId !== mySessionId.current) return;
+    }
 
     switch (payload.type) {
       case 'user-joined':
-        addToast("Có người mới tham gia!", "success"); // <--- THÊM
-        console.log(`User mới ${payload.sessionId} vào phòng. Mình (Initiator) sẽ gọi.`);
+        addToast("Có người mới tham gia!", "success");
+        console.log(`User mới ${payload.sessionId} vào phòng.`);
         cleanupRemoteConnection(); 
         setParticipantCount(2);
         setRemoteParticipantName(`User ${payload.sessionId?.substring(0, 6)}`);
@@ -188,8 +172,8 @@ export default function RoomPage() {
         break;
 
       case 'offer':
-        addToast("Nhận cuộc gọi từ người khác", "info"); // ← SỬA MESSAGE
-        console.log(`Nhận Offer từ ${payload.senderSessionId}. Mình (Receiver) sẽ trả lời.`);
+        addToast("Nhận cuộc gọi từ người khác", "info");
+        console.log(`Nhận Offer từ ${payload.senderSessionId}.`);
         cleanupRemoteConnection(); 
         setParticipantCount(2);
         setRemoteParticipantName(`User ${payload.senderSessionId?.substring(0, 6)}`);
@@ -197,19 +181,18 @@ export default function RoomPage() {
         break;
 
       case 'answer':
-        console.log(`Nhận Answer từ ${payload.senderSessionId}. Kết nối P2P...`);
+        console.log(`Nhận Answer từ ${payload.senderSessionId}.`);
         if (peerRef.current) peerRef.current.signal(payload.data);
         break;
 
-      case 'ice-candidate': // Hỗ trợ trường hợp backend gửi ICE riêng lẻ (nếu trickle: true)
+      case 'ice-candidate':
         if (peerRef.current) peerRef.current.signal(payload.data);
         break;
         
       case 'user-left':
-        // ✅ LUÔN XỬ LÝ user-left, không quan tâm sessionId
         console.log(`User ${payload.sessionId || payload.senderSessionId} đã rời phòng.`);
         addToast("Người kia đã rời khỏi phòng", "warning");
-        cleanupRemoteConnection(); // Gọi 1 lần duy nhất
+        cleanupRemoteConnection();
         break;
     }
   };
@@ -218,13 +201,12 @@ export default function RoomPage() {
   const createPeer = (targetSessionId: string, stream: MediaStream) => {
     const peer = new SimplePeer({
       initiator: true,
-      trickle: false, // Gom SDP + ICE thành 1 cục
+      trickle: false,
       stream: stream,
-      config: rtcConfig // <--- THÊM CẤU HÌNH STUN SERVER
+      config: rtcConfig
     });
 
     peer.on('signal', (signal) => {
-      // Chỉ gửi khi đã gom đủ tín hiệu (type: 'offer')
       if (signal.type === 'offer') {
           stompClientRef.current?.publish({
             destination: '/app/signal',
@@ -238,20 +220,19 @@ export default function RoomPage() {
       }
     });
 
-    setupPeerEvents(peer); // Cài đặt các log sự kiện chung
+    setupPeerEvents(peer);
     peerRef.current = peer;
   };
 
   // --- 2. NGƯỜI NHẬN (RECEIVER) ---
   const addPeer = (incomingSignal: any, senderSessionId: string, stream: MediaStream) => {
-    // Nếu có peer cũ, hủy đi để nhận cuộc gọi mới
     if (peerRef.current) peerRef.current.destroy();
 
     const peer = new SimplePeer({
       initiator: false,
       trickle: false,
       stream: stream,
-      config: rtcConfig // <--- THÊM CẤU HÌNH STUN SERVER
+      config: rtcConfig
     });
 
     peer.on('signal', (signal) => {
@@ -268,57 +249,36 @@ export default function RoomPage() {
       }
     });
 
-    peer.signal(incomingSignal); // Nạp Offer vào
-    setupPeerEvents(peer);       // Cài đặt các log sự kiện chung
+    peer.signal(incomingSignal);
+    setupPeerEvents(peer);
     peerRef.current = peer;
   };
 
-  // --- HÀM HELPER: LẮNG NGHE SỰ KIỆN P2P ---
   const setupPeerEvents = (peer: SimplePeer.Instance) => {
     peer.on('stream', (stream) => {
       console.log(">>> ĐÃ NHẬN ĐƯỢC REMOTE STREAM! <<<");
-      console.log("Remote stream tracks:", stream.getTracks());
       setRemoteStream(stream);
       setIsRemoteConnected(true);
-      addToast("Kết nối video thành công!", "success"); // ← THÊM
-      console.log("Remote stream saved to state, UI will re-render");
-    });
-
-    peer.on('connect', () => {
-      console.log(">>> KẾT NỐI P2P THÀNH CÔNG! (Status: Connected) <<<");
+      addToast("Kết nối video thành công!", "success");
     });
 
     peer.on('close', () => {
-      console.log(">>> KẾT NỐI P2P ĐÃ ĐÓNG <<<");
       addToast("Người kia đã ngắt kết nối", "warning");
-      cleanupRemoteConnection(); // ← ĐÃ CÓ
+      cleanupRemoteConnection();
     });
 
     peer.on('error', (err) => {
       console.error(">>> LỖI P2P:", err);
-      addToast("Lỗi kết nối Video (P2P): " + err.message, "error"); // <--- THÊM
+      addToast("Lỗi kết nối Video (P2P): " + err.message, "error");
       cleanupRemoteConnection();
-      // Tùy chọn: Có thể thử gọi lại hoặc yêu cầu reload
     });
   };
 
   useEffect(() => {
     if (isRemoteConnected && remoteVideoRef.current && remoteStream) {
-      console.log("Gắn remote stream vào video element...");
       remoteVideoRef.current.srcObject = remoteStream;
-      
-      // Debug events
-      remoteVideoRef.current.onloadedmetadata = () => {
-        console.log("Remote video metadata loaded!");
-      };
-      
-      remoteVideoRef.current.onplay = () => {
-        console.log("Remote video started playing!");
-      };
-      
-      console.log("✅ Remote stream attached successfully!");
     }
-  }, [isRemoteConnected, remoteStream]); // Chạy lại khi 2 biến này thay đổi
+  }, [isRemoteConnected, remoteStream]);
 
   // --- UI LOGIC ---
   const toggleMic = () => { if (localStream) { const t = localStream.getAudioTracks()[0]; if(t) { t.enabled = !t.enabled; setIsMuted(!t.enabled); } } };
@@ -334,11 +294,7 @@ export default function RoomPage() {
       {/* Header */}
       <div className="room-header">
         <div className="room-info">
-          <div className="room-id">
-            📹 {roomId}
-          </div>
-    
-          {/* --- BADGE TRẠNG THÁI --- */}
+          <div className="room-id">📹 {roomId}</div>
           <div className={`connection-badge status-${connectionStatus}`}>
             <div className="connection-dot"></div>
             <span>
@@ -347,24 +303,16 @@ export default function RoomPage() {
               {connectionStatus === 'disconnected' && "Offline"}
             </span>
           </div>
-
-          <div className="participant-count">
-            👥 {participantCount} participant{participantCount > 1 ? 's' : ''}
-          </div>
+          <div className="participant-count">👥 {participantCount} participant{participantCount > 1 ? 's' : ''}</div>
         </div>
-        
-        <button 
-          className="btn-secondary" 
-          onClick={() => navigator.clipboard.writeText(`${window.location.origin}/room/${roomId}`)}
-          style={{ padding: '0.5rem 1rem', fontSize: '0.9rem' }}
-        >
+        <button className="btn-secondary" onClick={() => navigator.clipboard.writeText(`${window.location.origin}/room/${roomId}`)} style={{ padding: '0.5rem 1rem', fontSize: '0.9rem' }}>
           📋 Copy Link
         </button>
       </div>
 
       {/* Video Grid */}
       <div className={`video-grid ${participantCount === 1 ? 'single-participant' : 'two-participants'}`}>
-        {/* REMOTE VIDEO - Luôn hiển thị slot này */}
+        {/* REMOTE VIDEO */}
         <div className="video-card">
           {!isRemoteConnected ? (
             <div className="waiting-participant">
@@ -378,12 +326,7 @@ export default function RoomPage() {
                 ref={remoteVideoRef} 
                 autoPlay 
                 playsInline 
-                style={{ 
-                  width: '100%', 
-                  height: '100%', 
-                  objectFit: 'cover',
-                  transform: 'scaleX(-1)'
-                }}
+                style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)' }}
               />
               <div className="participant-overlay">
                 <div className="participant-name">{remoteParticipantName}</div>
@@ -396,123 +339,55 @@ export default function RoomPage() {
           )}
         </div>
 
-        {/* LOCAL VIDEO - Hiển thị khác nhau tùy trạng thái */}
+        {/* LOCAL VIDEO */}
         {isRemoteConnected ? (
-          // Picture-in-Picture khi có remote user
           <div 
             className={`video-card local-video ${isLocalVideoMinimized ? 'minimized' : ''}`}
             onClick={() => setIsLocalVideoMinimized(!isLocalVideoMinimized)}
           >
-            {isCameraOff && (
-              <div className="camera-off-overlay">
-                <div className="icon">📷</div>
-                <div className="text">Camera Off</div>
-              </div>
-            )}
-          
+            {isCameraOff && <div className="camera-off-overlay"><div className="icon">📷</div><div className="text">Camera Off</div></div>}
             <video 
-              ref={localVideoRef} 
-              autoPlay 
-              muted 
-              playsInline 
-              style={{ 
-                width: '100%', 
-                height: '100%', 
-                objectFit: 'cover', 
-                opacity: isCameraOff ? 0 : 1, 
-                transform: 'scaleX(-1)' 
-              }} 
+              ref={localVideoRef} autoPlay muted playsInline 
+              style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: isCameraOff ? 0 : 1, transform: 'scaleX(-1)' }} 
             />
-            
             <div className="participant-overlay">
               <div className="participant-name">You</div>
-              <div className="participant-status">
-                <div className={`status-indicator ${isMuted ? 'muted' : ''}`}>
-                  {isMuted ? '🔇' : '🎤'}
-                </div>
-                <div className={`status-indicator ${isCameraOff ? 'camera-off' : ''}`}>
-                  {isCameraOff ? '🚫' : '📹'}
-                </div>
-              </div>
             </div>
           </div>
         ) : (
-          // Full size khi chưa có remote user
           <div className="video-card">
-            {isCameraOff && (
-              <div className="camera-off-overlay">
-                <div className="icon">📷</div>
-                <div className="text">Your Camera is Off</div>
-              </div>
-            )}
-            
+            {isCameraOff && <div className="camera-off-overlay"><div className="icon">📷</div><div className="text">Your Camera is Off</div></div>}
             <video 
-              ref={localVideoRef} 
-              autoPlay 
-              muted 
-              playsInline 
-              style={{ 
-                width: '100%', 
-                height: '100%', 
-                objectFit: 'cover', 
-                opacity: isCameraOff ? 0 : 1, 
-                transform: 'scaleX(-1)' 
-              }} 
+              ref={localVideoRef} autoPlay muted playsInline 
+              style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: isCameraOff ? 0 : 1, transform: 'scaleX(-1)' }} 
             />
-
             <div className="participant-overlay">
-              <div className="participant-name">You (Waiting for others)</div>
-              <div className="participant-status">
-                <div className={`status-indicator ${isMuted ? 'muted' : ''}`}>
-                  {isMuted ? '🔇' : '🎤'}
-                </div>
-                <div className={`status-indicator ${isCameraOff ? 'camera-off' : ''}`}>
-                  {isCameraOff ? '🚫' : '📹'}
-                </div>
-              </div>
+              <div className="participant-name">You (Waiting)</div>
             </div>
           </div>
         )}
-        
-        <div className="toast-container">
-          {toasts.map(toast => (
-            <div key={toast.id} className={`toast ${toast.type}`}>
-              {/* Icon tương ứng */}
-              {toast.type === 'success' && '✅'}
-              {toast.type === 'error' && '❌'}
-              {toast.type === 'warning' && '⚠️'}
-              {toast.type === 'info' && 'ℹ️'}
-              <span>{toast.message}</span>
-            </div>
-          ))}
-        </div>
       </div>
+
       {/* Controls */}
       <div className="controls-bar">
-        <button 
-          className={`control-btn ${isMuted ? 'off' : ''}`} 
-          onClick={toggleMic}
-        >
-          {isMuted ? "🔇" : "🎤"}
-          <div className="control-tooltip">
-            {isMuted ? 'Unmute' : 'Mute'}
-          </div>
+        <button className={`control-btn ${isMuted ? 'off' : ''}`} onClick={toggleMic}>
+          {isMuted ? "🔇" : "🎤"} <div className="control-tooltip">{isMuted ? 'Unmute' : 'Mute'}</div>
         </button>
-        
-        <button 
-          className={`control-btn ${isCameraOff ? 'off' : ''}`} 
-          onClick={toggleCamera}
-        >
-          {isCameraOff ? "🚫" : "📹"}
-          <div className="control-tooltip">
-            {isCameraOff ? 'Turn on camera' : 'Turn off camera'}
-          </div>
+        <button className={`control-btn ${isCameraOff ? 'off' : ''}`} onClick={toggleCamera}>
+          {isCameraOff ? "🚫" : "📹"} <div className="control-tooltip">{isCameraOff ? 'Turn on camera' : 'Turn off camera'}</div>
         </button>
-        
         <button className="control-btn btn-hangup" onClick={handleHangUp}>
-          📞
-          <div className="control-tooltip">Leave call</div>
+          📞 <div className="control-tooltip">Leave call</div>
         </button>
+      </div>
+
+      {/* Toasts */}
+      <div className="toast-container">
+        {toasts.map(toast => (
+          <div key={toast.id} className={`toast ${toast.type}`}>
+            <span>{toast.message}</span>
+          </div>
+        ))}
       </div>
     </div>
   );

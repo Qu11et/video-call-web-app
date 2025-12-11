@@ -17,6 +17,7 @@ export default function GroupCallPage() {
   const navigate = useNavigate();
   
   const [token, setToken] = useState("");
+  const [serverUrl, setServerUrl] = useState(""); // Thêm state này
 
   // Giả lập thông tin user (Trong thực tế nên lấy từ Login)
   // Mỗi lần vào sẽ random một ID để test nhiều tab
@@ -29,7 +30,7 @@ export default function GroupCallPage() {
     const fetchToken = async () => {
       try {
         // Gọi API Backend Spring Boot để lấy Token
-        const response = await fetch(`http://localhost:8080/api/rooms/${roomId}/token`, {
+        const response = await fetch(`/api/rooms/${roomId}/token`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
@@ -44,6 +45,7 @@ export default function GroupCallPage() {
 
         const data = await response.json();
         setToken(data.token);
+        setServerUrl(data.serverUrl); // Lấy serverUrl từ backend
       } catch (error) {
         console.error(error);
         alert("Không thể lấy Token từ Backend. Hãy chắc chắn Backend đang chạy!");
@@ -68,7 +70,7 @@ export default function GroupCallPage() {
       video={true} // Tự động bật cam
       audio={true} // Tự động bật mic
       token={token}
-      serverUrl="ws://localhost:7880" // Địa chỉ LiveKit Server (Docker)
+      serverUrl={serverUrl} // Dùng serverUrl từ backend thay vì hardcode
       // Khi người dùng bấm nút rời phòng trên giao diện LiveKit
       onDisconnected={() => navigate('/')}
       data-lk-theme="default"

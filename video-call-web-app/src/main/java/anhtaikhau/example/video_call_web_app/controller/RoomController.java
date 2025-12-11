@@ -5,6 +5,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.beans.factory.annotation.Value;
 
 import java.util.Map;
 import java.util.Set;
@@ -80,6 +81,9 @@ public class RoomController {
         }
     }
 
+    @Value("${livekit.url:wss://livekit.lkht.id.vn}") // Đổi default thành wss
+    private String liveKitUrl;
+
     /**
      * API MỚI: Lấy token để join vào LiveKit Room (SFU)
      * POST /api/rooms/{roomId}/token
@@ -107,7 +111,7 @@ public class RoomController {
         // 3. Trả về token và URL của LiveKit Server (để Frontend kết nối)
         return ResponseEntity.ok(Map.of(
             "token", token,
-            "serverUrl", "ws://localhost:7880" // Địa chỉ LiveKit Docker
+            "serverUrl", liveKitUrl // Trả về IP thật của VPS
         ));
     }
 }
