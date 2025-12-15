@@ -1,13 +1,19 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { createRoomApi, checkRoomExistsApi } from '../api'; 
+import { createRoomApi, checkRoomExistsApi } from '../api';
+import { useSelector, useDispatch } from 'react-redux'; // Thêm useDispatch
+import type { RootState } from '../store/store';
+import { logout } from '../store/authSlice'; // Thêm action logout
 
 export default function LandingPage() {
   const [roomId, setRoomId] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+  const dispatch = useDispatch();
 
- const handleCreateRoom = async (type: 'P2P' | 'GROUP') => {
+  const { isAuthenticated, user } = useSelector((state: RootState) => state.auth);
+
+  const handleCreateRoom = async (type: 'P2P' | 'GROUP') => {
     setIsLoading(true);
     const newRoomId = await createRoomApi(type); // Gọi API với type
     setIsLoading(false);
@@ -47,8 +53,33 @@ export default function LandingPage() {
     }
   };
 
+  const handleLogout = () => {
+    dispatch(logout());
+    // TODO: Sau này gọi thêm API logout để xóa cookie backend
+  };
+
   return (
     <div className="landing-container">
+      {/* Thêm Header nhỏ ở góc để hiển thị User */}
+      <div style={{ position: 'absolute', top: 20, right: 20, display: 'flex', gap: '10px', alignItems: 'center' }}>
+        {isAuthenticated ? (
+          <>
+            <span>Xin chào, <strong>{user?.email}</strong></span>
+            <button className="btn-secondary" style={{ padding: '5px 10px', fontSize: '0.8rem' }} onClick={handleLogout}>
+              Đăng xuất
+            </button>
+          </>
+        ) : (
+          <>
+            <button className="btn-secondary" style={{ padding: '5px 15px' }} onClick={() => navigate('/login')}>
+              Đăng nhập
+            </button>
+            <button className="btn-primary" style={{ padding: '5px 15px' }} onClick={() => navigate('/register')}>
+              Đăng ký
+            </button>
+          </>
+        )}
+      </div>
       <div className="landing-card">
         <h1>📹 Video Call App</h1>
         <p>Chọn chế độ gọi phù hợp</p>

@@ -1,3 +1,5 @@
+import type { UserCreationRequest, SignInRequest, UserProfile } from './types/auth'; // Nhớ update types/auth.ts nếu thiếu UserProfile
+
 const API_BASE_URL = "/api/rooms";
 
 export const createRoomApi = async (type: 'P2P' | 'GROUP' = 'P2P'): Promise<string | null> => {
@@ -33,5 +35,72 @@ export const checkRoomExistsApi = async (roomId: string): Promise<{ exists: bool
   } catch (error) {
     console.error("Lỗi khi kiểm tra phòng:", error);
     return { exists: false };
+  }
+};
+
+const API_BASE = "/api/v1";
+
+export const authApi = {
+  // Đăng ký tài khoản
+  register: async (data: UserCreationRequest): Promise<{ success: boolean; message?: string }> => {
+    try {
+      const response = await fetch(`${API_BASE}/users/registration`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      });
+
+      if (response.ok) {
+        return { success: true };
+      } else {
+        const errorData = await response.text(); // Hoặc json() tùy backend trả về lỗi gì
+        return { success: false, message: errorData || 'Đăng ký thất bại' };
+      }
+    } catch (error) {
+      return { success: false, message: 'Lỗi kết nối server' };
+    }
+  },
+
+  // Đăng nhập
+  login: async (data: SignInRequest): Promise<{ success: boolean; user?: UserProfile; message?: string }> => {
+    try {
+      const response = await fetch(`${API_BASE}/auth/sign-in`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+        // KHÔNG CẦN credentials: 'include' ở đây vì cookie được set bởi response
+      });
+
+      if (response.ok) {
+        // Sau khi login thành công, gọi ngay API verify để lấy info đầy đủ
+        return authApi.verifyToken(); 
+      } else {
+        return { success: false, message: 'Đăng nhập thất bại' };
+      }
+    } catch (error) {
+      return { success: false, message: 'Lỗi kết nối' };
+    }
+  },
+
+  // HÀM MỚI: Verify Token (Dùng để auto login khi F5)
+  verifyToken: async (): Promise<{ success: boolean; user?: UserProfile; message?: string }> => {
+    try {
+      const response = await fetch(`${API_BASE}/auth/verify`, {
+        method: 'GET',
+        // QUAN TRỌNG: Gửi cookie đi kèm request
+        // Vì Backend và Frontend cùng domain (nhờ Nginx), nên trình duyệt tự gửi.
+        // Nhưng nếu test local khác port, có thể cần credentials: 'include'
+      });
+
+      if (response.ok) {
+        const userData = await response.json();
+        return { success: true, user: userData };
+      }
+      return { success: false };
+    } catch (error) {
+      return { success: false };
+    }
   }
 };
