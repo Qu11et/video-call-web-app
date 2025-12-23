@@ -32,4 +32,4 @@ build/
 ### VS Code ###
 .vscode/
 
-./video-call-web-app/src/main/resources/application.properties
+video-call-web-app/src/main/resources/application.properties
