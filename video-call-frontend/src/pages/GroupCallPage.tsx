@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useSelector } from 'react-redux'; 
+import type { RootState } from '../store/store'; 
 import {
   LiveKitRoom,
   VideoConference,
@@ -16,16 +18,26 @@ export default function GroupCallPage() {
   const { roomId } = useParams();
   const navigate = useNavigate();
   
-  const [token, setToken] = useState("");
-  const [serverUrl, setServerUrl] = useState(""); // Thêm state này
+  // 1. Lấy thông tin từ Redux
+  const { user, isAuthenticated } = useSelector((state: RootState) => state.auth);
 
-  // Giả lập thông tin user (Trong thực tế nên lấy từ Login)
-  // Mỗi lần vào sẽ random một ID để test nhiều tab
-  const [userId] = useState("user-" + Math.random().toString(36).substring(7));
-  const [userName] = useState("User " + Math.floor(Math.random() * 100));
+  // 2. Logic tạo định danh (Identity)
+  // Nếu đã login -> Dùng Email/Tên thật
+  // Nếu chưa login -> Tạo tên Guest ngẫu nhiên
+  const [guestId] = useState("guest-" + Math.random().toString(36).substring(7));
+  const [guestName] = useState("Khách " + Math.floor(Math.random() * 1000));
+
+  const userId = isAuthenticated ? user?.email : guestId;
+  const userName = isAuthenticated ? user?.fullName : guestName;
+
+  const [token, setToken] = useState("");
+  const [serverUrl, setServerUrl] = useState("");
 
   useEffect(() => {
     if (!roomId) return;
+
+    // Nếu chưa đăng nhập, có thể đá về login hoặc cho phép làm Guest (tùy bạn)
+    // if (!isAuthenticated) navigate('/login');
 
     const fetchToken = async () => {
       try {
@@ -34,8 +46,8 @@ export default function GroupCallPage() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
-            userId: userId,
-            name: userName
+            userId: userId, 
+            name: userName        
           })
         });
 
@@ -52,7 +64,6 @@ export default function GroupCallPage() {
         navigate('/');
       }
     };
-
     fetchToken();
   }, [roomId, userId, userName, navigate]);
 

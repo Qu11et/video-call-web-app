@@ -67,8 +67,13 @@ public class User implements UserDetails {
         return true;
     }
 
+    @Enumerated(EnumType.STRING)
+    private UserStatus status; // PENDING, ACTIVE
+
+    // Sửa lại isEnabled dựa trên status
     @Override
     public boolean isEnabled() {
-        return true;
+        return this.status == UserStatus.ACTIVE;
     }
 }
+

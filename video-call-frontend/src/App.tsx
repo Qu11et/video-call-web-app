@@ -9,6 +9,7 @@ import GroupCallPage from './pages/GroupCallPage'; // File mới placeholder
 import RegisterPage from './pages/RegisterPage';
 import LoginPage from './pages/LoginPage';
 import NotFoundPage from './pages/NotFoundPage';
+import VerifyEmailPage from './pages/VerifyEmailPage';
 
 function App() {
   const dispatch = useDispatch<AppDispatch>();
@@ -21,12 +22,14 @@ function App() {
   return (
     <Routes>
       <Route path="/" element={<LandingPage />} />
+
       <Route path="/register" element={<RegisterPage />} /> {/* <--- Route mới */}
-      
       <Route path="/login" element={<LoginPage />} />
 
       <Route path="/room/p2p/:roomId" element={<P2PCallPage />} />
       <Route path="/room/group/:roomId" element={<GroupCallPage />} />
+
+      <Route path="/verify-email" element={<VerifyEmailPage />} />
 
       {/* Catch-all route - PHẢI ĐẶT CUỐI CÙNG */}
       <Route path="*" element={<NotFoundPage />} />

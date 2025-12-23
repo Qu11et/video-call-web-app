@@ -45,7 +45,7 @@ export const loginAsync = createAsyncThunk<
   }
 );
 
-// --- MỚI: ACTION VERIFY TOKEN (AUTO LOGIN) ---
+// ACTION VERIFY TOKEN (AUTO LOGIN) ---
 export const verifyTokenAsync = createAsyncThunk<
   UserProfile, // Trả về User nếu token valid
   void,        // Không cần tham số
@@ -63,15 +63,25 @@ export const verifyTokenAsync = createAsyncThunk<
   }
 );
 
+// --- SỬA/THÊM ACTION LOGOUT ASYNC ---
+export const logoutAsync = createAsyncThunk(
+  'auth/logout',
+  async () => {
+    // Gọi API để Backend xóa cookie
+    await authApi.logout();
+    // Không cần return gì cả
+  }
+);
+
 const authSlice = createSlice({
   name: 'auth',
   initialState,
   reducers: {
-    logout: (state) => {
-      state.user = null;
-      state.isAuthenticated = false;
-      // TODO: Gọi API logout để xóa cookie backend
-    },
+    // logout: (state) => {
+    //   state.user = null;
+    //   state.isAuthenticated = false;
+    //   // TODO: Gọi API logout để xóa cookie backend
+    // },
     clearError: (state) => {
       state.error = null;
     }
@@ -121,10 +131,24 @@ const authSlice = createSlice({
         state.isAuthenticated = false; // Token lỗi/hết hạn -> Logout
         state.user = null;
         state.isLoading = false;
+      })
+
+      // --- XỬ LÝ LOGOUT ---
+      .addCase(logoutAsync.fulfilled, (state) => {
+        state.user = null;
+        state.isAuthenticated = false;
+        state.isLoading = false;
+      })
+      // Dù API lỗi mạng thì phía Client cũng nên clear state để user thoát ra
+      .addCase(logoutAsync.rejected, (state) => {
+        state.user = null;
+        state.isAuthenticated = false;
       });
   },
 });
 
-export const { logout, clearError } = authSlice.actions;
+// Export logoutAsync thay vì logout cũ
+// export const { logout, clearError } = authSlice.actions; // Cũ
+export const { clearError } = authSlice.actions; // Mới
 export default authSlice.reducer;
 

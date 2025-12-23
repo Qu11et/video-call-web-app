@@ -41,13 +41,21 @@ public class AuthCookieManager {
     }
 
     public void clearCookies(HttpServletResponse response) {
-        Cookie cookie = new Cookie("access_token", null);
+        // 1. Xóa Access Token
+        Cookie cookie = new Cookie("access_token", null); // Value null cũng được
         cookie.setPath("/");
-        cookie.setMaxAge(0);
+        cookie.setDomain(domain); // <--- BẮT BUỘC PHẢI CÓ VÀ GIỐNG LÚC TẠO
+        cookie.setSecure(secure); // <--- NÊN CÓ CHO ĐỒNG BỘ
+        cookie.setHttpOnly(httpOnly); 
+        cookie.setMaxAge(0);      // <--- Đây là lệnh xóa
         response.addCookie(cookie);
         
+        // 2. Xóa Refresh Token
         Cookie refreshCookie = new Cookie("refresh_token", null);
         refreshCookie.setPath("/api/v1/auth/refresh");
+        refreshCookie.setDomain(domain); // <--- BẮT BUỘC PHẢI CÓ
+        refreshCookie.setSecure(secure);
+        refreshCookie.setHttpOnly(httpOnly);
         refreshCookie.setMaxAge(0);
         response.addCookie(refreshCookie);
     }

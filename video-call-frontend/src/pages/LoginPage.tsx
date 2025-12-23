@@ -33,12 +33,15 @@ export default function LoginPage() {
         password: formData.password
       })).unwrap();
 
-      // Xử lý logic dựa trên status user (Point 2 của bạn)
-      if (user.status === 'PENDING_SETUP') {
-        navigate('/onboarding');
-      } else {
-        navigate('/');
-      }
+      // Tạm thời bỏ qua logic onboarding, luôn về trang chủ
+      navigate('/');
+
+      // // Xử lý logic dựa trên status user (Point 2 của bạn)
+      // if (user.status === 'PENDING_SETUP') {
+      //   navigate('/onboarding');
+      // } else {
+      //   navigate('/');
+      // }
 
     } catch (errorMsg) {
       // ❌ Xử lý lỗi (Rejected case)

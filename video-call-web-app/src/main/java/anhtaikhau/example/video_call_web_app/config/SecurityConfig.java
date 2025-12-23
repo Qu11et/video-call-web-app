@@ -22,12 +22,12 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthFilter;
-    private final UserDetailsService userDetailsService; // ← Inject từ UserDetailsServiceImpl
+    private final UserDetailsService userDetailsService;
 
     @Bean
     public AuthenticationProvider authenticationProvider() {
         DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider();
-        authProvider.setUserDetailsService(userDetailsService); // ← Dùng bean đã inject
+        authProvider.setUserDetailsService(userDetailsService);
         authProvider.setPasswordEncoder(passwordEncoder());
         return authProvider;
     }
@@ -47,13 +47,16 @@ public class SecurityConfig {
         http
             .csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(auth -> auth
-                // Cho phép public endpoints
-                .requestMatchers(
-                    "/api/v1/auth/**", 
-                    "/api/v1/users/registration",
-                    "/ws/**", 
-                    "/api/rooms/**"
-                ).permitAll()
+                // ✅ CHO PHÉP WEBSOCKET (Quan trọng nhất!)
+                .requestMatchers("/ws/**").permitAll()
+                
+                // Các API Public khác
+                .requestMatchers("/api/v1/auth/sign-in", "/api/v1/auth/resend-verification", "/api/v1/auth/logout").permitAll()
+                .requestMatchers("/api/v1/users/registration").permitAll()
+                .requestMatchers("/api/v1/users/verify").permitAll()
+                .requestMatchers("/api/rooms/**").permitAll()
+                
+                // Các API còn lại bắt buộc đăng nhập
                 .anyRequest().authenticated()
             )
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))

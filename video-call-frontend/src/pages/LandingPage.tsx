@@ -2,14 +2,15 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createRoomApi, checkRoomExistsApi } from '../api';
 import { useSelector, useDispatch } from 'react-redux'; // Thêm useDispatch
-import type { RootState } from '../store/store';
-import { logout } from '../store/authSlice'; // Thêm action logout
+import type { AppDispatch, RootState } from '../store/store';
+import { logoutAsync } from '../store/authSlice'; // Import cái Async mới
+//import { logout } from '../store/authSlice'; // Thêm action logout
 
 export default function LandingPage() {
   const [roomId, setRoomId] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
-  const dispatch = useDispatch();
+  const dispatch = useDispatch<AppDispatch>(); // Nhớ dùng AppDispatch để dispatch thunk được
 
   const { isAuthenticated, user } = useSelector((state: RootState) => state.auth);
 
@@ -54,8 +55,8 @@ export default function LandingPage() {
   };
 
   const handleLogout = () => {
-    dispatch(logout());
-    // TODO: Sau này gọi thêm API logout để xóa cookie backend
+    // Gọi action async
+    dispatch(logoutAsync());
   };
 
   return (
@@ -71,6 +72,7 @@ export default function LandingPage() {
           </>
         ) : (
           <>
+            <span style={{color: '#999', fontStyle: 'italic'}}>Khách</span>
             <button className="btn-secondary" style={{ padding: '5px 15px' }} onClick={() => navigate('/login')}>
               Đăng nhập
             </button>

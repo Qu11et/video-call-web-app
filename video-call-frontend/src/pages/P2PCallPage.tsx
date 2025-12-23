@@ -3,10 +3,13 @@ import { useParams, useNavigate } from 'react-router-dom';
 import SimplePeer from 'simple-peer';
 import SockJS from 'sockjs-client';
 import { Client } from '@stomp/stompjs';
+import { useSelector } from 'react-redux';
+import type { RootState } from '../store/store';
 
 interface SignalMessage {
   type: string;
   senderSessionId: string;
+  senderName?: string;
   targetSessionId?: string;
   sessionId?: string;
   data?: any;
@@ -44,7 +47,16 @@ export default function P2PCallPage() {
   const stompClientRef = useRef<Client | null>(null);
   const started = useRef(false);
   
-  const mySessionId = useRef(Math.random().toString(36).substring(7));
+  // Lấy user từ Redux
+  const { user, isAuthenticated } = useSelector((state: RootState) => state.auth);
+
+  // Logic tạo ID/Name cho Guest
+  const guestId = useRef("guest-" + Math.random().toString(36).substring(7)).current;
+  const guestName = useRef("Khách " + Math.floor(Math.random() * 1000)).current;
+
+  // Chọn ID/Name để sử dụng
+  const mySessionId = useRef(isAuthenticated ? user?.email : guestId);
+  const myName = isAuthenticated ? user?.fullName : guestName;
 
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'reconnecting' | 'disconnected'>('disconnected');
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
@@ -133,7 +145,8 @@ export default function P2PCallPage() {
           destination: '/app/join',
           body: JSON.stringify({ 
             roomId: roomId, 
-            myID: mySessionId.current 
+            myID: mySessionId.current,
+            displayName: myName // <--- Gửi tên lên để Backend báo cho người khác
           }),
         });
       },
@@ -176,12 +189,16 @@ export default function P2PCallPage() {
         console.log(`Nhận Offer từ ${payload.senderSessionId}.`);
         cleanupRemoteConnection(); 
         setParticipantCount(2);
-        setRemoteParticipantName(`User ${payload.senderSessionId?.substring(0, 6)}`);
+        // Hiển thị tên thật của người gọi đến
+        setRemoteParticipantName(payload.senderName || `User ${payload.senderSessionId?.substring(0, 6)}`);
         addPeer(payload.data, payload.senderSessionId, stream);
         break;
 
       case 'answer':
         console.log(`Nhận Answer từ ${payload.senderSessionId}.`);
+        if (payload.senderName) {
+            setRemoteParticipantName(payload.senderName);
+        }
         if (peerRef.current) peerRef.current.signal(payload.data);
         break;
 
@@ -208,15 +225,16 @@ export default function P2PCallPage() {
 
     peer.on('signal', (signal) => {
       if (signal.type === 'offer') {
-          stompClientRef.current?.publish({
-            destination: '/app/signal',
-            body: JSON.stringify({
-              type: 'offer',
-              data: signal,
-              targetSessionId: targetSessionId,
-              senderSessionId: mySessionId.current
-            })
-          });
+        stompClientRef.current?.publish({
+          destination: '/app/signal',
+          body: JSON.stringify({
+            type: 'offer',
+            data: signal,
+            targetSessionId: targetSessionId,
+            senderSessionId: mySessionId.current,
+            senderName: myName // <--- Gửi tên mình kèm Offer
+          })
+        });
       }
     });
 
@@ -237,15 +255,16 @@ export default function P2PCallPage() {
 
     peer.on('signal', (signal) => {
       if (signal.type === 'answer') {
-          stompClientRef.current?.publish({
-            destination: '/app/signal',
-            body: JSON.stringify({
-              type: 'answer',
-              data: signal,
-              targetSessionId: senderSessionId,
-              senderSessionId: mySessionId.current
-            })
-          });
+        stompClientRef.current?.publish({
+          destination: '/app/signal',
+          body: JSON.stringify({
+            type: 'answer',
+            data: signal,
+            targetSessionId: senderSessionId,
+            senderSessionId: mySessionId.current,
+            senderName: myName // <--- Gửi tên mình kèm Answer
+          })
+        });
       }
     });
 

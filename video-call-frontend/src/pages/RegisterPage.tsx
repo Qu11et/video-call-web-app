@@ -18,6 +18,8 @@ export default function RegisterPage() {
 
   const [validationError, setValidationError] = useState('');
 
+  const [isRegisterSuccess, setIsRegisterSuccess] = useState(false); 
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
     // Clear lỗi khi user nhập lại
@@ -50,11 +52,42 @@ export default function RegisterPage() {
     }));
 
     // 3. Xử lý kết quả
+    // if (registerAsync.fulfilled.match(resultAction)) {
+    //   alert('Đăng ký thành công! Vui lòng đăng nhập.');
+    //   navigate('/login'); // Chuyển sang trang login (sẽ tạo sau)
+    // }
+
     if (registerAsync.fulfilled.match(resultAction)) {
-      alert('Đăng ký thành công! Vui lòng đăng nhập.');
-      navigate('/login'); // Chuyển sang trang login (sẽ tạo sau)
+      // --- THAY VÌ ALERT, TA SET STATE ---
+      setIsRegisterSuccess(true);
     }
   };
+
+  // --- NẾU THÀNH CÔNG, HIỂN THỊ GIAO DIỆN THÔNG BÁO ---
+  if (isRegisterSuccess) {
+    return (
+      <div className="landing-container">
+        <div className="landing-card" style={{ textAlign: 'center' }}>
+          <h1 style={{ fontSize: '3rem', marginBottom: '1rem' }}>📧</h1>
+          <h2 style={{ color: '#4ade80' }}>Đăng ký thành công!</h2>
+          <p style={{ margin: '1rem 0', lineHeight: '1.5', color: '#e8eaed' }}>
+            Một email xác thực đã được gửi đến: <br/>
+            <strong>{formData.email}</strong>
+          </p>
+          <p style={{ fontSize: '0.9rem', color: '#9aa0a6' }}>
+            Vui lòng kiểm tra hộp thư (bao gồm cả mục Spam) và nhấn vào link để kích hoạt tài khoản.
+          </p>
+          <button 
+            className="btn-primary" 
+            style={{ marginTop: '2rem', width: '100%' }}
+            onClick={() => navigate('/login')}
+          >
+            Đến trang Đăng Nhập
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="landing-container">

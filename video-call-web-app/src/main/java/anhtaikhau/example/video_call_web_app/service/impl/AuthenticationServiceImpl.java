@@ -9,6 +9,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.stereotype.Service;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.DisabledException;
 
 @Service
 @RequiredArgsConstructor
@@ -19,14 +21,24 @@ public class AuthenticationServiceImpl {
     private final JwtService jwtService;
 
     public TokenExchangeResponse authenticate(SignInRequest request) {
-        // 1. Xác thực qua Spring Security
-        authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
-        );
-
-        // 2. Lấy thông tin user
+        // 1. Kiểm tra User có tồn tại không trước
         var user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new BadCredentialsException("Email này chưa được đăng ký!"));
+
+        // 2. Kiểm tra trạng thái xác thực Email
+        // Giả sử bạn đã thêm field status và enum UserStatus ở các bước trước
+        if (!user.isEnabled()) {
+            throw new DisabledException("Tài khoản chưa xác thực email. Vui lòng kiểm tra hộp thư của bạn.");
+        }        
+
+        // 3. Nếu qua được 2 bước trên, mới gọi AuthenticationManager để check password
+        try {
+            authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
+            );
+        } catch (BadCredentialsException e) {
+            throw new BadCredentialsException("Mật khẩu không chính xác!");
+        }
 
         // 3. Build Token (Access + Refresh)
         var accessToken = jwtService.generateToken(user);

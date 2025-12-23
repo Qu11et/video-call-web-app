@@ -74,17 +74,20 @@ export const authApi = {
       });
 
       if (response.ok) {
+        const result = await response.json(); // Backend trả TokenExchangeResponse
         // Sau khi login thành công, gọi ngay API verify để lấy info đầy đủ
         return authApi.verifyToken(); 
       } else {
-        return { success: false, message: 'Đăng nhập thất bại' };
+        // --- ĐOẠN NÀY QUAN TRỌNG: Đọc message lỗi từ GlobalExceptionHandler ---
+        const errorData = await response.json().catch(() => ({ message: 'Lỗi không xác định' }));
+        return { success: false, message: errorData.message || 'Đăng nhập thất bại' };
       }
     } catch (error) {
       return { success: false, message: 'Lỗi kết nối' };
     }
   },
 
-  // HÀM MỚI: Verify Token (Dùng để auto login khi F5)
+  // Verify Token (Dùng để auto login khi F5)
   verifyToken: async (): Promise<{ success: boolean; user?: UserProfile; message?: string }> => {
     try {
       const response = await fetch(`${API_BASE}/auth/verify`, {
@@ -99,6 +102,19 @@ export const authApi = {
         return { success: true, user: userData };
       }
       return { success: false };
+    } catch (error) {
+      return { success: false };
+    }
+  },
+
+  // HÀM MỚI: Logout
+  logout: async (): Promise<{ success: boolean }> => {
+    try {
+      await fetch(`${API_BASE}/auth/logout`, {
+        method: 'POST',
+      });
+      // Không cần quan tâm response body, miễn gọi thành công là cookie bay màu
+      return { success: true };
     } catch (error) {
       return { success: false };
     }
