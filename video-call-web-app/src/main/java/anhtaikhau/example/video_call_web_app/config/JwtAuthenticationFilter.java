@@ -35,6 +35,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     ) throws ServletException, IOException {
 
         String requestPath = request.getServletPath();
+        
+        // ✅ LOG REQUEST PATH ĐỂ DEBUG
+        log.info("🔍 Processing request: {} {}", request.getMethod(), requestPath);
+
+        if (requestPath.startsWith("/api/webhook/")) {
+            filterChain.doFilter(request, response);
+            return;
+        }
 
         // ✅ BỎ QUA JWT FILTER CHO WEBSOCKET VÀ CÁC ENDPOINT PUBLIC
         if (requestPath.startsWith("/ws") ||
@@ -45,6 +53,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             requestPath.equals("/api/v1/users/verify") ||
             requestPath.startsWith("/api/rooms/")) {
             
+            log.info("⏩ Skipping JWT filter for public endpoint: {}", requestPath);
             filterChain.doFilter(request, response);
             return;
         }
@@ -56,6 +65,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         final String authHeader = request.getHeader("Authorization");
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             jwt = authHeader.substring(7);
+            log.info("✅ JWT found in Authorization header");
         }
 
         // 4. Nếu Header không có, tìm trong Cookie
@@ -63,6 +73,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             for (Cookie cookie : request.getCookies()) {
                 if ("access_token".equals(cookie.getName())) {
                     jwt = cookie.getValue();
+                    log.info("✅ JWT found in Cookie");
                     break;
                 }
             }
@@ -70,8 +81,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         // Nếu không tìm thấy token -> Cho qua (SecurityConfig sẽ chặn 403 sau đó)
         if (jwt == null) {
-            // Log nhẹ để debug xem tại sao 403
-            log.warn("Request to {} failed: No JWT found in Header or Cookie", requestPath);
+            log.warn("❌ Request to {} failed: No JWT found in Header or Cookie", requestPath);
             filterChain.doFilter(request, response);
             return;
         }
@@ -79,8 +89,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         // 5. Xác thực Token
         try {
             userEmail = jwtService.extractUsername(jwt);
+            log.info("📧 Extracted email from JWT: {}", userEmail);
+            
             if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                 UserDetails userDetails = this.userDetailsService.loadUserByUsername(userEmail);
+                
+                log.info("👤 User authorities: {}", userDetails.getAuthorities());
                 
                 if (jwtService.isTokenValid(jwt, userDetails)) {
                     UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
@@ -90,12 +104,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     );
                     authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                     SecurityContextHolder.getContext().setAuthentication(authToken);
+                    log.info("✅ JWT authentication successful for user: {}", userEmail);
+                } else {
+                    log.warn("❌ JWT token is invalid for user: {}", userEmail);
                 }
             }
         } catch (Exception e) {
-            log.error("JWT Authentication failed for {}: {}", requestPath, e.getMessage());
+            log.error("❌ JWT Authentication failed for {}: {}", requestPath, e.getMessage());
         }
         
         filterChain.doFilter(request, response);
     }
-}
+}    

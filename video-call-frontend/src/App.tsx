@@ -10,6 +10,7 @@ import RegisterPage from './pages/RegisterPage';
 import LoginPage from './pages/LoginPage';
 import NotFoundPage from './pages/NotFoundPage';
 import VerifyEmailPage from './pages/VerifyEmailPage';
+import AdminDashboard from './pages/AdminDashboard';
 
 function App() {
   const dispatch = useDispatch<AppDispatch>();
@@ -23,8 +24,10 @@ function App() {
     <Routes>
       <Route path="/" element={<LandingPage />} />
 
-      <Route path="/register" element={<RegisterPage />} /> {/* <--- Route mới */}
+      <Route path="/register" element={<RegisterPage />} /> 
       <Route path="/login" element={<LoginPage />} />
+
+      <Route path="/admin" element={<AdminDashboard />} />
 
       <Route path="/room/p2p/:roomId" element={<P2PCallPage />} />
       <Route path="/room/group/:roomId" element={<GroupCallPage />} />

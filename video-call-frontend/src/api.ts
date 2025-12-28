@@ -1,5 +1,49 @@
 import type { UserCreationRequest, SignInRequest, UserProfile } from './types/auth'; // Nhớ update types/auth.ts nếu thiếu UserProfile
 
+// Interface cho Meeting (Mapping với Model MongoDB)
+export interface ParticipantInfo {
+  identity: string;
+  name: string;
+  joinedAt: string;
+  leftAt: string;
+}
+
+export interface Meeting {
+  id: string;
+  roomId: string;
+  startTime: string;
+  endTime: string;
+  durationSeconds: number;
+  participants: ParticipantInfo[];
+}
+
+export interface PageResponse<T> {
+  content: T[];
+  totalPages: number;
+  totalElements: number;
+  number: number; // Current page
+}
+
+export const adminApi = {
+  // GET /api/v1/admin/meetings?page=0&size=10
+  getMeetings: async (page: number = 0, size: number = 10): Promise<PageResponse<Meeting> | null> => {
+    try {
+      const response = await fetch(`${API_BASE}/admin/meetings?page=${page}&size=${size}`, {
+        method: 'GET',
+        // Cookie sẽ tự động được gửi đi để xác thực ADMIN
+      });
+
+      if (response.ok) {
+        return await response.json();
+      }
+      return null;
+    } catch (error) {
+      console.error("Lỗi lấy lịch sử cuộc họp:", error);
+      return null;
+    }
+  }
+};
+
 const API_BASE_URL = "/api/rooms";
 
 export const createRoomApi = async (type: 'P2P' | 'GROUP' = 'P2P'): Promise<string | null> => {
