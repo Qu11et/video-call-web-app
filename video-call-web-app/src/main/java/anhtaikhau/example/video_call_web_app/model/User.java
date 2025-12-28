@@ -75,5 +75,8 @@ public class User implements UserDetails {
     public boolean isEnabled() {
         return this.status == UserStatus.ACTIVE;
     }
+
+    @OneToMany(mappedBy = "user", fetch = FetchType.LAZY)
+    private List<ParticipantHistory> meetingHistories;
 }
 

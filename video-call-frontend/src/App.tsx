@@ -11,6 +11,7 @@ import LoginPage from './pages/LoginPage';
 import NotFoundPage from './pages/NotFoundPage';
 import VerifyEmailPage from './pages/VerifyEmailPage';
 import AdminDashboard from './pages/AdminDashboard';
+import ProfilePage from './pages/ProfilePage';
 
 function App() {
   const dispatch = useDispatch<AppDispatch>();
@@ -28,6 +29,7 @@ function App() {
       <Route path="/login" element={<LoginPage />} />
 
       <Route path="/admin" element={<AdminDashboard />} />
+      <Route path="/profile" element={<ProfilePage />} />
 
       <Route path="/room/p2p/:roomId" element={<P2PCallPage />} />
       <Route path="/room/group/:roomId" element={<GroupCallPage />} />
