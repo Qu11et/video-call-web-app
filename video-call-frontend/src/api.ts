@@ -36,7 +36,16 @@ export interface UserProfileResponse {
   email: string;
   fullName: string;
   role: string;
-  history: MeetingHistory[];
+  //history: MeetingHistory[];
+}
+
+// 2. Dùng lại PageResponse đã định nghĩa ở phần Admin
+// (Nếu chưa có thì định nghĩa lại ở đây)
+export interface PageResponse<T> {
+  content: T[];
+  totalPages: number;
+  totalElements: number;
+  number: number;
 }
 
 export const userApi = {
@@ -54,6 +63,22 @@ export const userApi = {
       return null; // Trả về null nếu lỗi (401, 403, 500)
     } catch (error) {
       console.error("Lỗi lấy profile:", error);
+      return null;
+    }
+  },
+
+  // HÀM MỚI: Lấy lịch sử phân trang
+  getHistory: async (page: number = 0, size: number = 5): Promise<PageResponse<MeetingHistory> | null> => {
+    try {
+      const response = await fetch(`${API_BASE}/users/history?page=${page}&size=${size}`, {
+        method: 'GET',
+      });
+      if (response.ok) {
+        return await response.json();
+      }
+      return null;
+    } catch (error) {
+      console.error("Lỗi lấy lịch sử:", error);
       return null;
     }
   }

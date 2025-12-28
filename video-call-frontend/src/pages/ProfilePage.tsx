@@ -1,29 +1,38 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { userApi } from '../api';
-import type { UserProfileResponse } from '../api';
+import type { UserProfileResponse, MeetingHistory, PageResponse  } from '../api';
+
 
 export default function ProfilePage() {
   const navigate = useNavigate();
+  // State cho User Info
   const [profile, setProfile] = useState<UserProfileResponse | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  
+  // State cho History Pagination
+  const [historyData, setHistoryData] = useState<PageResponse<MeetingHistory> | null>(null);
+  const [currentPage, setCurrentPage] = useState(0);
+  const [isHistoryLoading, setIsHistoryLoading] = useState(false);
 
+  // 1. Fetch Profile (Chạy 1 lần)
   useEffect(() => {
-    const fetchProfile = async () => {
-      setIsLoading(true);
-      const data = await userApi.getProfile();
-      if (data) {
-        setProfile(data);
-      } else {
-        // Nếu không lấy được profile (do chưa login hoặc hết hạn token)
-        // Chuyển hướng về trang login
-        navigate('/login');
-      }
-      setIsLoading(false);
-    };
-
-    fetchProfile();
+    userApi.getProfile()
+      .then(data => {
+        if (data) setProfile(data);
+        else navigate('/login');
+      });
   }, [navigate]);
+
+  // 2. Fetch History (Chạy mỗi khi currentPage thay đổi)
+  useEffect(() => {
+    const fetchHistory = async () => {
+      setIsHistoryLoading(true);
+      const data = await userApi.getHistory(currentPage, 5); // Lấy 5 dòng mỗi trang
+      if (data) setHistoryData(data);
+      setIsHistoryLoading(false);
+    };
+    fetchHistory();
+  }, [currentPage]);
 
   // Helper format thời gian
   const formatDateTime = (isoString: string) => {
@@ -44,7 +53,7 @@ export default function ProfilePage() {
     return `${secs}s`;
   };
 
-  if (isLoading) {
+  if (isHistoryLoading) {
     return (
       <div className="landing-container">
         <div style={{ color: 'white' }}>⏳ Đang tải thông tin...</div>
@@ -52,7 +61,7 @@ export default function ProfilePage() {
     );
   }
 
-  if (!profile) return null;
+  if (!profile) return <div className="landing-container" style={{color:'white'}}>Loading...</div>;
 
   return (
     <div className="landing-container" style={{ justifyContent: 'flex-start', paddingTop: '40px' }}>
@@ -95,55 +104,74 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        {/* Lịch sử tham gia */}
+        {/* --- PHẦN LỊCH SỬ CÓ PAGINATION --- */}
         <h3 style={{ borderBottom: '1px solid #5f6368', paddingBottom: '10px', marginBottom: '15px' }}>
-          📜 Lịch sử tham gia cuộc họp
+          📜 Lịch sử tham gia ({historyData?.totalElements || 0})
         </h3>
 
-        <div className="table-responsive">
-          <table className="admin-table">
-            <thead>
-              <tr>
-                <th>STT</th>
-                <th>Mã phòng</th>
-                <th>Thời gian tham gia</th>
-                <th>Thời lượng phòng</th>
-                <th>Hành động</th>
-              </tr>
-            </thead>
-            <tbody>
-              {profile.history && profile.history.length > 0 ? (
-                profile.history.map((item, index) => (
-                  <tr key={index}>
-                    <td>{index + 1}</td>
-                    <td>
-                      <span style={{ color: '#8ab4f8', fontWeight: '500' }}>{item.roomId}</span>
-                    </td>
-                    <td>{formatDateTime(item.joinedAt)}</td>
-                    <td>{formatDuration(item.durationSeconds)}</td>
-                    <td>
-                      {/* Nút join lại phòng cũ */}
-                      <button 
-                        className="btn-secondary" 
-                        style={{ padding: '4px 10px', fontSize: '0.8rem' }}
-                        onClick={() => navigate(`/room/group/${item.roomId}`)}
-                      >
-                        Vào lại
-                      </button>
-                    </td>
+        {isHistoryLoading ? (
+            <p style={{textAlign: 'center', color: '#9aa0a6'}}>Đang tải lịch sử...</p>
+        ) : (
+            <>
+            <div className="table-responsive">
+              <table className="admin-table">
+                <thead>
+                  <tr>
+                    <th>Mã phòng</th>
+                    <th>Thời gian</th>
+                    <th>Thời lượng</th>
+                    <th>Hành động</th>
                   </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={5} style={{ textAlign: 'center', padding: '30px', color: '#9aa0a6' }}>
-                    Bạn chưa tham gia cuộc họp nào.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+                </thead>
+                <tbody>
+                  {historyData?.content.map((item, index) => (
+                    <tr key={index}>
+                      <td><span style={{ color: '#8ab4f8' }}>{item.roomId}</span></td>
+                      <td>{formatDateTime(item.joinedAt)}</td>
+                      <td>{formatDuration(item.durationSeconds)}</td>
+                      <td>
+                        <button 
+                          className="btn-secondary" 
+                          style={{ padding: '4px 10px', fontSize: '0.8rem' }}
+                          onClick={() => navigate(`/room/group/${item.roomId}`)}
+                        >
+                          Vào lại
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                  {historyData?.content.length === 0 && (
+                    <tr><td colSpan={4} style={{ textAlign: 'center', padding: '20px' }}>Chưa có lịch sử.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
 
+            {/* Pagination Controls */}
+            {historyData && historyData.totalPages > 1 && (
+                <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', marginTop: '20px' }}>
+                  <button 
+                    className="btn-secondary" 
+                    disabled={historyData.number === 0}
+                    onClick={() => setCurrentPage(p => p - 1)}
+                  >
+                    &lt; Trước
+                  </button>
+                  <span style={{ display: 'flex', alignItems: 'center', fontSize: '0.9rem' }}>
+                    Trang {historyData.number + 1} / {historyData.totalPages}
+                  </span>
+                  <button 
+                    className="btn-secondary" 
+                    disabled={historyData.number >= historyData.totalPages - 1}
+                    onClick={() => setCurrentPage(p => p + 1)}
+                  >
+                    Sau &gt;
+                  </button>
+                </div>
+            )}
+            </>
+        )}
+        
       </div>
     </div>
   );
