@@ -65,7 +65,24 @@ export default function LandingPage() {
       <div style={{ position: 'absolute', top: 20, right: 20, display: 'flex', gap: '10px', alignItems: 'center' }}>
         {isAuthenticated ? (
           <>
-            <span>Xin chào, <strong>{user?.email}</strong></span>
+
+            {/* --- SỬA ĐỔI TẠI ĐÂY: Biến tên người dùng thành nút bấm --- */}
+            <div 
+              style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
+              onClick={() => navigate('/profile')}
+              title="Xem hồ sơ cá nhân"
+            >
+                <div style={{
+                    width: '32px', height: '32px', borderRadius: '50%', 
+                    background: '#8ab4f8', color: '#202124', 
+                    display: 'flex', justifyContent: 'center', alignItems: 'center',
+                    fontWeight: 'bold'
+                }}>
+                    {user?.fullName?.charAt(0).toUpperCase() || 'U'}
+                </div>
+                <span>{user?.email}</span>
+            </div>
+            {/* --------------------------------------------------------- */}
 
             {/* --- NÚT ADMIN --- */}
             {user?.role === 'ADMIN' && (
@@ -77,7 +94,7 @@ export default function LandingPage() {
                 Trang Admin
               </button>
             )}
-            
+
             <button className="btn-secondary" style={{ padding: '5px 10px', fontSize: '0.8rem' }} onClick={handleLogout}>
               Đăng xuất
             </button>

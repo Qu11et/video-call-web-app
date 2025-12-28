@@ -24,6 +24,41 @@ export interface PageResponse<T> {
   number: number; // Current page
 }
 
+// --- USER PROFILE API ---
+
+export interface MeetingHistory {
+  roomId: string;
+  joinedAt: string;       // ISO Date String
+  durationSeconds: number; // Thời lượng cuộc họp
+}
+
+export interface UserProfileResponse {
+  email: string;
+  fullName: string;
+  role: string;
+  history: MeetingHistory[];
+}
+
+export const userApi = {
+  // GET /api/v1/users/profile
+  getProfile: async (): Promise<UserProfileResponse | null> => {
+    try {
+      const response = await fetch(`${API_BASE}/users/profile`, {
+        method: 'GET',
+        // Cookie HttpOnly tự động được gửi đi để xác thực
+      });
+
+      if (response.ok) {
+        return await response.json();
+      }
+      return null; // Trả về null nếu lỗi (401, 403, 500)
+    } catch (error) {
+      console.error("Lỗi lấy profile:", error);
+      return null;
+    }
+  }
+};
+
 export const adminApi = {
   // GET /api/v1/admin/meetings?page=0&size=10
   getMeetings: async (page: number = 0, size: number = 10): Promise<PageResponse<Meeting> | null> => {

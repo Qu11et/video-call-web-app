@@ -22,56 +22,59 @@ public class MeetingService {
 
     private final MeetingRepository meetingRepository;
 
+    // --- PHẦN GHI (WRITE) ĐÃ BỊ XÓA ---
+    // Vì logic này đã chuyển sang MeetingEventListener để xử lý Async
     /**
      * Xử lý sự kiện khi phòng họp kết thúc
      */
-    public void handleRoomFinished(LiveKitWebhookEvent event, ParticipantTracker tracker) {
-        log.info("Đang xử lý room_finished cho phòng: {}", event.getRoom().getName());
+    // public void handleRoomFinished(LiveKitWebhookEvent event, ParticipantTracker tracker) {
+    //     log.info("Đang xử lý room_finished cho phòng: {}", event.getRoom().getName());
 
-        try {
-            LocalDateTime start = unixToLocal(event.getRoom().getCreationTime());
-            Long endTimeUnix = event.getRoom().getEndTime();
-            LocalDateTime end = endTimeUnix != null ? unixToLocal(endTimeUnix) : LocalDateTime.now();
+    //     try {
+    //         LocalDateTime start = unixToLocal(event.getRoom().getCreationTime());
+    //         Long endTimeUnix = event.getRoom().getEndTime();
+    //         LocalDateTime end = endTimeUnix != null ? unixToLocal(endTimeUnix) : LocalDateTime.now();
             
-            Long duration = null;
-            if (event.getRoom().getCreationTime() != null && endTimeUnix != null) {
-                duration = endTimeUnix - event.getRoom().getCreationTime();
-            } else if (event.getRoom().getCreationTime() != null) {
-                duration = Instant.now().getEpochSecond() - event.getRoom().getCreationTime();
-            }
+    //         Long duration = null;
+    //         if (event.getRoom().getCreationTime() != null && endTimeUnix != null) {
+    //             duration = endTimeUnix - event.getRoom().getCreationTime();
+    //         } else if (event.getRoom().getCreationTime() != null) {
+    //             duration = Instant.now().getEpochSecond() - event.getRoom().getCreationTime();
+    //         }
 
-            // ✅ LẤY PARTICIPANTS TỪ TRACKER
-            List<ParticipantTracker.ParticipantData> trackedParticipants = 
-                tracker.getAndRemoveParticipants(event.getRoom().getName());
+    //         // ✅ LẤY PARTICIPANTS TỪ TRACKER
+    //         List<ParticipantTracker.ParticipantData> trackedParticipants = 
+    //             tracker.getAndRemoveParticipants(event.getRoom().getName());
             
-            List<Meeting.ParticipantInfo> participants = new ArrayList<>();
-            for (var p : trackedParticipants) {
-                participants.add(new Meeting.ParticipantInfo(
-                    p.getIdentity(),
-                    p.getName(),
-                    unixToLocal(p.getJoinedAt()),
-                    unixToLocal(p.getLeftAt())
-                ));
-            }
+    //         List<Meeting.ParticipantInfo> participants = new ArrayList<>();
+    //         for (var p : trackedParticipants) {
+    //             participants.add(new Meeting.ParticipantInfo(
+    //                 p.getIdentity(),
+    //                 p.getName(),
+    //                 unixToLocal(p.getJoinedAt()),
+    //                 unixToLocal(p.getLeftAt())
+    //             ));
+    //         }
 
-            Meeting meeting = Meeting.builder()
-                    .roomId(event.getRoom().getName())
-                    .startTime(start)
-                    .endTime(end)
-                    .durationSeconds(duration)
-                    .participants(participants)
-                    .build();
+    //         Meeting meeting = Meeting.builder()
+    //                 .roomId(event.getRoom().getName())
+    //                 .startTime(start)
+    //                 .endTime(end)
+    //                 .durationSeconds(duration)
+    //                 .participants(participants)
+    //                 .build();
 
-            meetingRepository.save(meeting);
-            log.info("✅ Đã lưu lịch sử cuộc họp vào MongoDB. ID: {}, Duration: {}s, Participants: {}", 
-                     meeting.getId(), duration, participants.size());
+    //         meetingRepository.save(meeting);
+    //         log.info("✅ Đã lưu lịch sử cuộc họp vào MongoDB. ID: {}, Duration: {}s, Participants: {}", 
+    //                  meeting.getId(), duration, participants.size());
 
-        } catch (Exception e) {
-            log.error("❌ Lỗi khi lưu meeting history: {}", e.getMessage(), e);
-            throw new RuntimeException("Failed to save meeting history", e);
-        }
-    }
+    //     } catch (Exception e) {
+    //         log.error("❌ Lỗi khi lưu meeting history: {}", e.getMessage(), e);
+    //         throw new RuntimeException("Failed to save meeting history", e);
+    //     }
+    // }
 
+    // --- PHẦN ĐỌC (READ) - Dùng cho Admin Dashboard ---
     /**
      * Lấy danh sách cuộc họp có phân trang
      */
