@@ -47,16 +47,15 @@ public class SecurityConfig {
         http
             .csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(auth -> auth
-                // ✅ CHO PHÉP WEBSOCKET (Quan trọng nhất!)
-                .requestMatchers("/ws/**").permitAll()
-                
-                // Các API Public khác
-                .requestMatchers("/api/v1/auth/sign-in", "/api/v1/auth/resend-verification", "/api/v1/auth/logout").permitAll()
-                .requestMatchers("/api/v1/users/registration").permitAll()
-                .requestMatchers("/api/v1/users/verify").permitAll()
-                .requestMatchers("/api/rooms/**").permitAll()
-                
-                // Các API còn lại bắt buộc đăng nhập
+                // 1. Các API Public (Giữ nguyên)
+                .requestMatchers("/api/v1/auth/**", "/api/v1/users/registration", "/api/v1/users/verify").permitAll()
+                .requestMatchers("/api/rooms/**", "/api/webhook/**").permitAll()
+
+                // 2. --- LUẬT BẢO MẬT MỚI CHO ADMIN ---
+                // Chỉ user có Role ADMIN mới được vào
+                .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
+
+                // 3. Các API còn lại yêu cầu đăng nhập (Role nào cũng được)
                 .anyRequest().authenticated()
             )
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))

@@ -747,6 +747,44 @@ button:disabled::before {
   }
 }
 
+/* --- ADMIN DASHBOARD --- */
+.table-responsive {
+  overflow-x: auto;
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+  font-size: 0.95rem;
+}
+
+.admin-table th, .admin-table td {
+  padding: 12px 15px;
+  text-align: left;
+  border-bottom: 1px solid #5f6368;
+}
+
+.admin-table th {
+  background-color: #202124;
+  color: #8ab4f8;
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.85rem;
+}
+
+.admin-table tr:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.room-badge {
+  background-color: rgba(138, 180, 248, 0.2);
+  color: #8ab4f8;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-family: monospace;
+}
+
 /* ========================================
    RESPONSIVE DESIGN
    ======================================== */

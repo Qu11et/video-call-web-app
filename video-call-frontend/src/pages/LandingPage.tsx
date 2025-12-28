@@ -66,6 +66,18 @@ export default function LandingPage() {
         {isAuthenticated ? (
           <>
             <span>Xin chào, <strong>{user?.email}</strong></span>
+
+            {/* --- NÚT ADMIN --- */}
+            {user?.role === 'ADMIN' && (
+              <button 
+                className="btn-primary" 
+                style={{ padding: '5px 10px', fontSize: '0.8rem', backgroundColor: '#e37400', color: 'white' }}
+                onClick={() => navigate('/admin')}
+              >
+                Trang Admin
+              </button>
+            )}
+            
             <button className="btn-secondary" style={{ padding: '5px 10px', fontSize: '0.8rem' }} onClick={handleLogout}>
               Đăng xuất
             </button>
