@@ -49,7 +49,7 @@ jobs:
         run: |
           DOCKER_IMAGE="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG}"
           
-          docker build -t $DOCKER_IMAGE ../video-call-web-app
+          docker build -t $DOCKER_IMAGE ./video-call-web-app
           docker push $DOCKER_IMAGE
 
       
