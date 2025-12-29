@@ -1,0 +1,55 @@
+name: Backend CI Build & Push
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'backend/**'       # <--- CHỈ chạy khi có thay đổi trong thư mục backend
+      - '.github/workflows/backend-ci.yaml' # Nên chạy khi sửa file workflow này
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - 'backend/**'
+
+env:
+  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  REGION: asia-southeast1
+  REPO_NAME: video-call-repo
+  # Đặt tên image riêng cho backend
+  IMAGE_NAME: video-call-backend 
+  GITOPS_REPO: <GITHUB_USER>/video-call-web-argocd
+
+jobs:
+  build-push-backend:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+
+    steps:
+      - name: Checkout Application Code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Configure Docker
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
+
+      - name: Set Short SHA
+        id: vars
+        run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+      # --- BUILD & PUSH BACKEND ---
+      - name: Build and Push Backend Image
+        env:
+          IMAGE_TAG: ${{ steps.vars.outputs.sha_short }}
+        run: |
+          DOCKER_IMAGE="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG}"
+          
+          docker build -t $DOCKER_IMAGE ../video-call-web-app
+          docker push $DOCKER_IMAGE
+
+      
