@@ -1,0 +1,57 @@
+name: CI Build & Push
+
+on:
+  push:
+    branches:
+      - main  # Trigger khi merge vào nhánh chính
+  pull_request:
+    branches:
+      - main
+
+env:
+  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  REGION: asia-east1 # Thay đổi theo region của bạn
+  REPO_NAME: video-call-repo # Tên Artifact Registry repo
+  IMAGE_NAME: video-call-app
+  GITOPS_REPO: <GITHUB_USER>/video-call-web-argocd # Thay thế bằng user/repo gitops của bạn
+
+jobs:
+  build-push-update:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+
+    steps:
+      # 1. Checkout code ứng dụng
+      - name: Checkout Application Code
+        uses: actions/checkout@v4
+
+      # 2. Xác thực với Google Cloud
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      # 3. Cấu hình Docker để push lên GCP
+      - name: Configure Docker
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
+
+      # 4. Tạo Short SHA và Output Variable
+      - name: Set Short SHA
+        id: vars
+        run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+      # 5. Build và Push Docker Image
+      - name: Build and Push Docker Image
+        env:
+          IMAGE_TAG: ${{ steps.vars.outputs.sha_short }}
+        run: |
+          DOCKER_IMAGE="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG}"
+          
+          docker build -t $DOCKER_IMAGE .
+          docker push $DOCKER_IMAGE
+          
+          echo "Image pushed: $DOCKER_IMAGE"
+
+      
