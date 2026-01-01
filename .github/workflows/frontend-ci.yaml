@@ -17,7 +17,7 @@ env:
   REPO_NAME: video-call-repo
   # Đặt tên image riêng cho frontend
   IMAGE_NAME: video-call-frontend 
-  GITOPS_REPO: <GITHUB_USER>/video-call-web-argocd
+  GITOPS_REPO: Qu11et/video-call-web-argocd
 
 jobs:
   build-push-frontend:
