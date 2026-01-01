@@ -52,4 +52,27 @@ jobs:
           docker build -t $DOCKER_IMAGE ./video-call-frontend
           docker push $DOCKER_IMAGE
 
+      # --- UPDATE GITOPS CHO FRONTEND ---
+      - name: Update GitOps Repository (Frontend)
+        if: github.event_name == 'push'
+        env:
+          GITOPS_TOKEN: ${{ secrets.GITOPS_TOKEN }}
+          IMAGE_TAG: ${{ steps.vars.outputs.sha_short }}
+        run: |
+          git config --global user.email "ci-bot@example.com"
+          git config --global user.name "CI Bot"
+          
+          git clone https://x-access-token:${GITOPS_TOKEN}@github.com/${{ env.GITOPS_REPO }}.git
+          cd video-call-web-argocd/overlays/prod
+
+          # Quan trọng: Chỉ update image của frontend-service
+          # Giả sử trong kustomization.yaml bạn đặt tên service là 'frontend-app'
+          kustomize edit set image frontend-app=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG}
+          
+          git add .
+          # Kiểm tra xem có gì thay đổi không trước khi commit để tránh lỗi empty commit
+          if ! git diff-index --quiet HEAD; then
+            git commit -m "update(frontend): set image tag to ${IMAGE_TAG}"
+            git push origin main
+          fi
       
