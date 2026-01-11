@@ -1,0 +1,16 @@
+db.meetings.find()
+db.meetings.find().pretty()
+db.meetings.find()
+db.meetings.find().pretty()
+db.meetings.find()
+db.meetings.find({})
+show collections
+db.meetings.find({})
+db.meetings.find().limit(10).pretty()
+show collections
+use meeting_history_db
+show dbs
+meeting_history_db
+show dbs
+meeting_history_db
+show dbs
