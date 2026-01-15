@@ -10,10 +10,10 @@ import { store } from './store/store'
 
 createRoot(document.getElementById('root')!).render(
   <Provider store={store}> {/* <--- Bọc Provider */}
-    <StrictMode>
-      <BrowserRouter>
-        <App />
-      </BrowserRouter>
-    </StrictMode>
+    {/* <StrictMode> */}
+    <BrowserRouter>
+      <App />
+    </BrowserRouter>
+    {/* </StrictMode> */}
   </Provider>,
 )

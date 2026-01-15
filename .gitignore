@@ -23,5 +23,5 @@
 hs_err_pid*
 replay_pid*
 
-#operation/*
-#video-call-web-app/src/main/resources/
+operation/*
+video-call-web-app/src/main/resources/
