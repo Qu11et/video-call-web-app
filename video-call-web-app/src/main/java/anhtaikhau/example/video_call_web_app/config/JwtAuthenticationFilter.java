@@ -34,14 +34,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             @NonNull FilterChain filterChain
     ) throws ServletException, IOException {
         
-        String path = request.getServletPath();
+        String requestPath = request.getServletPath();
         
         // ✅ THÊM ĐIỀU KIỆN NÀY - Bỏ qua WebSocket handshake
-        if (path.startsWith("/ws") || path.startsWith("/api/v1/auth") || 
-            path.startsWith("/api/rooms") || path.startsWith("/api/webhook")) {
+        if (requestPath.startsWith("/ws") || requestPath.startsWith("/api/v1/auth") || 
+            requestPath.startsWith("/api/rooms") || requestPath.startsWith("/api/webhook")) {
 
             // ✅ THÊM LOG ĐỂ DEBUG
-            System.out.println("✅ Bypassing JWT check for: " + path);
+            System.out.println("✅ Bypassing JWT check for: " + requestPath);
             
             filterChain.doFilter(request, response);
             return;
@@ -82,7 +82,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         // Nếu không tìm thấy token -> Cho qua (SecurityConfig sẽ chặn 403 sau đó)
         if (jwt == null) {
-            log.warn("❌ Request to {} failed: No JWT found in Header or Cookie", path);
+            log.warn("❌ Request to {} failed: No JWT found in Header or Cookie", requestPath);
             filterChain.doFilter(request, response);
             return;
         }
@@ -111,7 +111,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 }
             }
         } catch (Exception e) {
-            log.error("❌ JWT Authentication failed for {}: {}", path, e.getMessage());
+            log.error("❌ JWT Authentication failed for {}: {}", requestPath, e.getMessage());
         }
         
         filterChain.doFilter(request, response);
