@@ -1,33 +1,70 @@
-name: Backend CI Build & Push
+name: Backend CI/CD Pipeline (Sonar + Trivy + Build + GitOps)
 
 on:
   push:
     branches: [ "main" ]
     paths:
-      - 'backend/**'       # <--- CHỈ chạy khi có thay đổi trong thư mục backend
-      - '.github/workflows/backend-ci.yaml' # Nên chạy khi sửa file workflow này
-  pull_request:
-    branches: [ "main" ]
-    paths:
-      - 'backend/**'
+      - 'backend/**'           # Chỉ chạy khi code backend thay đổi
+      - '.github/workflows/backend-ci.yaml'
 
 env:
   PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
   REGION: asia-southeast1
   REPO_NAME: video-call-repo
-  # Đặt tên image riêng cho backend
-  IMAGE_NAME: video-call-backend 
+  IMAGE_NAME: video-call-backend
   GITOPS_REPO: Qu11et/video-call-web-argocd
+  # Đường dẫn tới file Dockerfile (tính từ root repo)
+  DOCKER_BUILD_CONTEXT: ./video-call-web-app
 
 jobs:
-  build-push-backend:
+  check-quality-and-security:
+    name: Code Quality & Security Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Bắt buộc cho SonarQube phân tích history
+
+      # --- 1. SONARQUBE / SONARCLOUD SCAN ---
+      # Bạn cần tạo project trên sonarcloud.io và lấy Token
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          java-version: 17
+          distribution: 'temurin'
+          cache: maven
+      
+      - name: Cache SonarCloud packages
+        uses: actions/cache@v3
+        with:
+          path: ~/.sonar/cache
+          key: ${{ runner.os }}-sonar
+          restore-keys: ${{ runner.os }}-sonar
+      
+      - name: Build and Analyze with SonarCloud
+        # Thay đổi đường dẫn tới thư mục backend chứa file pom.xml
+        run: |
+          cd video-call-web-app
+          mvn -B verify org.sonarsource.scanner.maven:sonar-maven-plugin:sonar \
+          -Dsonar.projectKey=Qu11et_video-call-web-app \
+          -Dsonar.organization=qu11et \
+          -Dsonar.host.url=https://sonarcloud.io \
+          -Dsonar.login=${{ secrets.SONAR_TOKEN }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+  build-and-push:
+    name: Build, Scan Vulnerabilities & Push
+    needs: check-quality-and-security # Chỉ chạy khi bước trên thành công
     runs-on: ubuntu-latest
     permissions:
       contents: 'read'
       id-token: 'write'
 
     steps:
-      - name: Checkout Application Code
+      - name: Checkout Code
         uses: actions/checkout@v4
 
       - name: Authenticate to Google Cloud
@@ -42,37 +79,57 @@ jobs:
         id: vars
         run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
 
-      # --- BUILD & PUSH BACKEND ---
-      - name: Build and Push Backend Image
+      # --- BUILD DOCKER IMAGE ---
+      - name: Build Docker Image
         env:
           IMAGE_TAG: ${{ steps.vars.outputs.sha_short }}
         run: |
-          DOCKER_IMAGE="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG}"
+          FULL_IMAGE_NAME="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG}"
+          echo "FULL_IMAGE_NAME=$FULL_IMAGE_NAME" >> $GITHUB_ENV
           
-          docker build -t $DOCKER_IMAGE ./video-call-web-app
-          docker push $DOCKER_IMAGE
+          docker build -t $FULL_IMAGE_NAME ${{ env.DOCKER_BUILD_CONTEXT }}
 
-      # --- UPDATE GITOPS CHO BACKEND ---
-      - name: Update GitOps Repository (Backend)
+      # --- 2. TRIVY SCAN (Quét lỗ hổng Image) ---
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.FULL_IMAGE_NAME }}
+          format: 'table'
+          exit-code: '1'          # Fail pipeline nếu có lỗ hổng Critical
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
+
+      # --- PUSH IMAGE (Chỉ push nếu Trivy scan OK) ---
+      - name: Push Docker Image
+        run: docker push ${{ env.FULL_IMAGE_NAME }}
+
+      # --- 3. UPDATE GITOPS (Dùng yq thay vì kustomize) ---
+      - name: Update GitOps Repo
         if: github.event_name == 'push'
         env:
           GITOPS_TOKEN: ${{ secrets.GITOPS_TOKEN }}
-          IMAGE_TAG: ${{ steps.vars.outputs.sha_short }}
         run: |
+          # Cấu hình Git
           git config --global user.email "ci-bot@example.com"
           git config --global user.name "CI Bot"
           
+          # Clone Repo GitOps
           git clone https://x-access-token:${GITOPS_TOKEN}@github.com/${{ env.GITOPS_REPO }}.git
-          cd video-call-web-argocd/overlays/prod
-
-          # Quan trọng: Chỉ update image của backend-service
-          # Giả sử trong kustomization.yaml bạn đặt tên service là 'backend-app'
-          kustomize edit set image backend-app=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG}
+          cd video-call-web-argocd
           
+          # Cài đặt yq (Tool sửa YAML xịn xò)
+          wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/bin/yq && chmod +x /usr/bin/yq
+          
+          # SỬA FILE 2-app.yaml TRỰC TIẾP
+          # Lệnh này tìm document có kind=Deployment và name=backend, sau đó sửa image dòng container đầu tiên
+          yq -i 'select(.kind == "Deployment" and .metadata.name == "backend").spec.template.spec.containers[0].image = "${{ env.FULL_IMAGE_NAME }}"' web-app/2-app.yaml
+          
+          # Commit & Push
           git add .
-          # Kiểm tra xem có gì thay đổi không trước khi commit để tránh lỗi empty commit
           if ! git diff-index --quiet HEAD; then
-            git commit -m "update(backend): set image tag to ${IMAGE_TAG}"
+            git commit -m "update(backend): set image to ${{ steps.vars.outputs.sha_short }}"
             git push origin main
+          else
+            echo "No changes to commit"
           fi
-      
