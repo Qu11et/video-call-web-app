@@ -47,15 +47,17 @@ public class SecurityConfig {
         http
             .csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(auth -> auth
-                // 1. Các API Public (Giữ nguyên)
+                // 1. API Public
                 .requestMatchers("/api/v1/auth/**", "/api/v1/users/registration", "/api/v1/users/verify").permitAll()
                 .requestMatchers("/api/rooms/**", "/api/webhook/**").permitAll()
-
-                // 2. --- LUẬT BẢO MẬT MỚI CHO ADMIN ---
-                // Chỉ user có Role ADMIN mới được vào
+                
+                // ✅ 2. THÊM DÒI NÀY - QUAN TRỌNG
+                .requestMatchers("/ws/**").permitAll()
+                
+                // 3. ADMIN API
                 .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
-
-                // 3. Các API còn lại yêu cầu đăng nhập (Role nào cũng được)
+                
+                // 4. Còn lại cần xác thực
                 .anyRequest().authenticated()
             )
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))

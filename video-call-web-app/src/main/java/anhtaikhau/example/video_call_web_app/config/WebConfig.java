@@ -13,6 +13,7 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
                 .allowedOriginPatterns("https://*.id.vn", "http://localhost:*", "*") 
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
                 .allowedHeaders("*")
-                .allowCredentials(true); // Nên để true để hỗ trợ Cookie/Auth sau này
+                .allowCredentials(true) // Nên để true để hỗ trợ Cookie/Auth sau này
+                .exposedHeaders("*");
         }
     }

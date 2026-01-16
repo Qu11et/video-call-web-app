@@ -11,7 +11,7 @@ WORKDIR /app
 COPY --from=build /app/target/*.jar app.jar
 
 # Biến môi trường cho LiveKit URL (để sửa lỗi trả về localhost)
-ENV LIVEKIT_URL=ws://localhost:7880
+ENV LIVEKIT_URL=wss://livekit.lkht.id.vn
 
 EXPOSE 8080
 ENTRYPOINT ["java", "-jar", "app.jar"]
