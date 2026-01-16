@@ -4,7 +4,7 @@ on:
   push:
     branches: [ "main" ]
     paths:
-      - 'frontend/**'           # Chỉ chạy khi code frontend thay đổi
+      - 'video-call-frontend/**'           # Chỉ chạy khi code frontend thay đổi
       - '.github/workflows/frontend-ci.yaml'
 
 env:
