@@ -50,6 +50,18 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         String jwt = null;
         String userEmail = null;
 
+        // --- THÊM LOG DEBUG ---
+        if (request.getCookies() != null) {
+            for (Cookie cookie : request.getCookies()) {
+                log.info("Cookie found: Name={}, Value={}", cookie.getName(), cookie.getValue());
+                if ("access_token".equals(cookie.getName())) {
+                    jwt = cookie.getValue();
+                }
+            }
+        } else {
+            log.warn("Request to {} has NO COOKIES!", requestPath);
+        }
+
         // 3. Ưu tiên lấy từ Header Authorization
         final String authHeader = request.getHeader("Authorization");
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
