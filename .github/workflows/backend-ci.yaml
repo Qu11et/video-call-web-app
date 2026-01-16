@@ -85,7 +85,7 @@ jobs:
           restore-keys: ${{ runner.os }}-sonar
       
       - name: Build and Analyze with SonarCloud
-        # ✅ GHI ĐÈ CẤU HÌNH ĐỂ TRỎ VỀ LOCALHOST
+        # ✅ GHI ĐÈ CẤU HÌNH ĐỂ TRỎ VỀ LOCALHOST.
         # Lúc này localhost chính là các service containers đã tạo ở trên
         run: |
           cd video-call-web-app
