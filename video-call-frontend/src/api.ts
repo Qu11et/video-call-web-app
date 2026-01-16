@@ -199,6 +199,7 @@ export const authApi = {
         // QUAN TRỌNG: Gửi cookie đi kèm request
         // Vì Backend và Frontend cùng domain (nhờ Nginx), nên trình duyệt tự gửi.
         // Nhưng nếu test local khác port, có thể cần credentials: 'include'
+        credentials: 'include',
       });
 
       if (response.ok) {
