@@ -4,7 +4,7 @@ on:
   push:
     branches: [ "main" ]
     paths:
-      - 'backend/**'           # Chỉ chạy khi code backend thay đổi
+      - 'backend/**'
       - '.github/workflows/backend-ci.yaml'
 
 env:
@@ -13,21 +13,63 @@ env:
   REPO_NAME: video-call-repo
   IMAGE_NAME: video-call-backend
   GITOPS_REPO: Qu11et/video-call-web-argocd
-  # Đường dẫn tới file Dockerfile (tính từ root repo)
   DOCKER_BUILD_CONTEXT: ./video-call-web-app
 
 jobs:
   check-quality-and-security:
     name: Code Quality & Security Check
     runs-on: ubuntu-latest
+    
+    # ✅ KHỞI TẠO CÁC DỊCH VỤ GIẢ LẬP (Service Containers)
+    services:
+      # 1. Postgres Database
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: video_call_db
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: password123
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      # 2. Redis Cache (Thêm cái này để fix lỗi Redis)
+      redis:
+        image: redis:alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      # 3. MongoDB (Thêm cái này để fix lỗi Mongo)
+      mongo:
+        image: mongo:6.0
+        env:
+          MONGO_INITDB_ROOT_USERNAME: root
+          MONGO_INITDB_ROOT_PASSWORD: password123
+          MONGO_INITDB_DATABASE: meeting_history_db
+        ports:
+          - 27017:27017
+        # Health check đơn giản cho Mongo
+        options: >-
+          --health-cmd "echo 'db.runCommand({ping:1})' | mongosh localhost:27017/test --quiet"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Bắt buộc cho SonarQube phân tích history
+          fetch-depth: 0
 
-      # --- 1. SONARQUBE / SONARCLOUD SCAN ---
-      # Bạn cần tạo project trên sonarcloud.io và lấy Token
       - name: Set up JDK 17
         uses: actions/setup-java@v3
         with:
@@ -43,21 +85,28 @@ jobs:
           restore-keys: ${{ runner.os }}-sonar
       
       - name: Build and Analyze with SonarCloud
-        # Thay đổi đường dẫn tới thư mục backend chứa file pom.xml
+        # ✅ GHI ĐÈ CẤU HÌNH ĐỂ TRỎ VỀ LOCALHOST
+        # Lúc này localhost chính là các service containers đã tạo ở trên
         run: |
           cd video-call-web-app
           mvn -B verify org.sonarsource.scanner.maven:sonar-maven-plugin:sonar \
-          -Dsonar.projectKey=Qu11et_video-call-web-app \
+          -Dsonar.projectKey=Qu11et_video-call-backend \
           -Dsonar.organization=qu11et \
           -Dsonar.host.url=https://sonarcloud.io \
-          -Dsonar.login=${{ secrets.SONAR_TOKEN }}
+          -Dsonar.login=${{ secrets.SONAR_TOKEN }} \
+          -Dspring.datasource.url=jdbc:postgresql://localhost:5432/video_call_db \
+          -Dspring.datasource.username=postgres \
+          -Dspring.datasource.password=password123 \
+          -Dspring.data.redis.host=localhost \
+          -Dspring.data.redis.port=6379 \
+          -Dspring.data.mongodb.uri="mongodb://root:password123@localhost:27017/meeting_history_db?authSource=admin"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
   build-and-push:
-    name: Build, Scan Vulnerabilities & Push
-    needs: check-quality-and-security # Chỉ chạy khi bước trên thành công
+    name: Build, Scan & Push
+    needs: check-quality-and-security
     runs-on: ubuntu-latest
     permissions:
       contents: 'read'
@@ -79,53 +128,38 @@ jobs:
         id: vars
         run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
 
-      # --- BUILD DOCKER IMAGE ---
       - name: Build Docker Image
         env:
           IMAGE_TAG: ${{ steps.vars.outputs.sha_short }}
         run: |
           FULL_IMAGE_NAME="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG}"
           echo "FULL_IMAGE_NAME=$FULL_IMAGE_NAME" >> $GITHUB_ENV
-          
           docker build -t $FULL_IMAGE_NAME ${{ env.DOCKER_BUILD_CONTEXT }}
 
-      # --- 2. TRIVY SCAN (Quét lỗ hổng Image) ---
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: ${{ env.FULL_IMAGE_NAME }}
           format: 'table'
-          exit-code: '1'          # Fail pipeline nếu có lỗ hổng Critical
+          exit-code: '1'
           ignore-unfixed: true
           vuln-type: 'os,library'
           severity: 'CRITICAL,HIGH'
 
-      # --- PUSH IMAGE (Chỉ push nếu Trivy scan OK) ---
       - name: Push Docker Image
         run: docker push ${{ env.FULL_IMAGE_NAME }}
 
-      # --- 3. UPDATE GITOPS (Dùng yq thay vì kustomize) ---
       - name: Update GitOps Repo
         if: github.event_name == 'push'
         env:
           GITOPS_TOKEN: ${{ secrets.GITOPS_TOKEN }}
         run: |
-          # Cấu hình Git
           git config --global user.email "ci-bot@example.com"
           git config --global user.name "CI Bot"
-          
-          # Clone Repo GitOps
           git clone https://x-access-token:${GITOPS_TOKEN}@github.com/${{ env.GITOPS_REPO }}.git
           cd video-call-web-argocd
-          
-          # Cài đặt yq (Tool sửa YAML xịn xò)
           wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/bin/yq && chmod +x /usr/bin/yq
-          
-          # SỬA FILE 2-app.yaml TRỰC TIẾP
-          # Lệnh này tìm document có kind=Deployment và name=backend, sau đó sửa image dòng container đầu tiên
           yq -i 'select(.kind == "Deployment" and .metadata.name == "backend").spec.template.spec.containers[0].image = "${{ env.FULL_IMAGE_NAME }}"' web-app/2-app.yaml
-          
-          # Commit & Push
           git add .
           if ! git diff-index --quiet HEAD; then
             git commit -m "update(backend): set image to ${{ steps.vars.outputs.sha_short }}"
