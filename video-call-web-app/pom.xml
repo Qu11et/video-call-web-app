@@ -30,7 +30,7 @@
         <java.version>17</java.version>
         
         <sonar.organization>qu11et</sonar.organization>
-        <sonar.projectKey>Qu11et_video-call-backend</sonar.projectKey>
+        <sonar.projectKey>qu11et_video-call-web-BE</sonar.projectKey>
         <sonar.host.url>https://sonarcloud.io</sonar.host.url>
         
         <sonar.exclusions>
