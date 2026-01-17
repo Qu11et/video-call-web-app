@@ -1,0 +1,53 @@
+name: Frontend Deploy to Production
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'video-call-frontend/**'
+      - '.github/workflows/frontend-ci.yaml'
+
+env:
+  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  REGION: asia-southeast1
+  REPO_NAME: video-call-repo
+  IMAGE_NAME: video-call-frontend
+  GITOPS_REPO: Qu11et/video-call-web-argocd
+
+jobs:
+  deploy:
+    name: Update GitOps Repo
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Get merged PR commit SHA
+        id: vars
+        run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Update GitOps Repo
+        env:
+          GITOPS_TOKEN: ${{ secrets.GITOPS_TOKEN }}
+          IMAGE_TAG: ${{ steps.vars.outputs.sha_short }}
+        run: |
+          FULL_IMAGE_NAME="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG}"
+          
+          git config --global user.email "ci-bot@example.com"
+          git config --global user.name "CI Bot"
+          
+          git clone https://x-access-token:${GITOPS_TOKEN}@github.com/${{ env.GITOPS_REPO }}.git
+          cd video-call-web-argocd
+          
+          wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/bin/yq && chmod +x /usr/bin/yq
+          
+          yq -i "select(.kind == \"Deployment\" and .metadata.name == \"frontend\").spec.template.spec.containers[0].image = \"${FULL_IMAGE_NAME}\"" web-app/2-app.yaml
+          
+          git add .
+          if ! git diff-index --quiet HEAD; then
+            git commit -m "deploy(frontend): update image to ${IMAGE_TAG}"
+            git push origin main
+          else
+            echo "No changes to commit"
+          fi
