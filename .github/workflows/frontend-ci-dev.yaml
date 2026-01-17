@@ -99,7 +99,20 @@ jobs:
             # echo "--- Content of .env ---"
             # cat .env
 
-            # Deploy Frontend
+            # Step 1: Đảm bảo database services đang chạy
+            echo "🗄️ Ensuring database services are running..."
+            docker compose -f docker-compose.postgres.yml up -d
+            
+            # Chờ database ready (nếu chưa chạy)
+            echo "⏳ Checking database readiness..."
+            sleep 5
+
+            # Step 2: Deploy Frontend
+            echo "🚀 Deploying frontend..."
             docker compose pull frontend
             docker compose up -d --remove-orphans frontend
+            
+            # Cleanup
             docker image prune -f
+            
+            echo "✅ Frontend deployment completed!"

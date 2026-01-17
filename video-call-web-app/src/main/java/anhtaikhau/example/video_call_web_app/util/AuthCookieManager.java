@@ -41,31 +41,26 @@ public class AuthCookieManager {
     }
 
     public void clearCookies(HttpServletResponse response) {
-        // 1. Xóa Access Token với path="/"
-        Cookie accessCookie1 = new Cookie("access_token", "");
-        accessCookie1.setPath("/");
-        accessCookie1.setDomain(domain);
-        accessCookie1.setSecure(secure);
-        accessCookie1.setHttpOnly(httpOnly); 
-        accessCookie1.setMaxAge(0);
-        response.addCookie(accessCookie1);
+        // Xóa Access Token - thử nhiều combination
+        clearCookie(response, "access_token", "/", domain);
+        clearCookie(response, "access_token", "/", null); // Không có domain
         
-        // 2. Xóa Refresh Token với path="/api/v1/auth/refresh"
-        Cookie refreshCookie = new Cookie("refresh_token", "");
-        refreshCookie.setPath("/api/v1/auth/refresh");
-        refreshCookie.setDomain(domain);
-        refreshCookie.setSecure(secure);
-        refreshCookie.setHttpOnly(httpOnly);
-        refreshCookie.setMaxAge(0);
-        response.addCookie(refreshCookie);
-        
-        // 3. Xóa Refresh Token với path="/" (phòng trường hợp cũ)
-        Cookie refreshCookie2 = new Cookie("refresh_token", "");
-        refreshCookie2.setPath("/");
-        refreshCookie2.setDomain(domain);
-        refreshCookie2.setSecure(secure);
-        refreshCookie2.setHttpOnly(httpOnly);
-        refreshCookie2.setMaxAge(0);
-        response.addCookie(refreshCookie2);
+        // Xóa Refresh Token với nhiều path
+        clearCookie(response, "refresh_token", "/api/v1/auth/refresh", domain);
+        clearCookie(response, "refresh_token", "/api/v1/auth/refresh", null);
+        clearCookie(response, "refresh_token", "/", domain);
+        clearCookie(response, "refresh_token", "/", null);
+    }
+    
+    private void clearCookie(HttpServletResponse response, String name, String path, String domain) {
+        Cookie cookie = new Cookie(name, "");
+        cookie.setPath(path);
+        if (domain != null && !domain.isEmpty()) {
+            cookie.setDomain(domain);
+        }
+        cookie.setMaxAge(0);
+        cookie.setHttpOnly(httpOnly);
+        // Không set secure để đảm bảo xóa được cả cookie HTTP và HTTPS
+        response.addCookie(cookie);
     }
 }
