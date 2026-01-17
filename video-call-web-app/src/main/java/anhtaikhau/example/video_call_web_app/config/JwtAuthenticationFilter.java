@@ -27,40 +27,39 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final JwtService jwtService;
     private final UserDetailsService userDetailsService;
 
-   @Override
+    @Override
     protected void doFilterInternal(
             @NonNull HttpServletRequest request,
             @NonNull HttpServletResponse response,
             @NonNull FilterChain filterChain
     ) throws ServletException, IOException {
-        
+
         String requestPath = request.getServletPath();
         
-        // ✅ THÊM ĐIỀU KIỆN NÀY - Bỏ qua WebSocket handshake
-        if (requestPath.startsWith("/ws") || requestPath.startsWith("/api/v1/auth") || 
-            requestPath.startsWith("/api/rooms") || requestPath.startsWith("/api/webhook")) {
+        // ✅ LOG REQUEST PATH ĐỂ DEBUG
+        log.info("🔍 Processing request: {} {}", request.getMethod(), requestPath);
 
-            // ✅ THÊM LOG ĐỂ DEBUG
-            System.out.println("✅ Bypassing JWT check for: " + requestPath);
+        if (requestPath.startsWith("/api/webhook/")) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
+        // ✅ BỎ QUA JWT FILTER CHO WEBSOCKET VÀ CÁC ENDPOINT PUBLIC
+        if (requestPath.startsWith("/ws") ||
+            requestPath.equals("/api/v1/auth/sign-in") ||
+            requestPath.equals("/api/v1/users/registration") ||
+            requestPath.equals("/api/v1/auth/resend-verification") ||
+            requestPath.equals("/api/v1/auth/logout") ||
+            requestPath.equals("/api/v1/users/verify") ||
+            requestPath.startsWith("/api/rooms/")) {
             
+            log.info("⏩ Skipping JWT filter for public endpoint: {}", requestPath);
             filterChain.doFilter(request, response);
             return;
         }
         
         String jwt = null;
         String userEmail = null;
-
-        // --- THÊM LOG DEBUG ---
-        if (request.getCookies() != null) {
-            for (Cookie cookie : request.getCookies()) {
-                log.info("Cookie found: Name={}, Value={}", cookie.getName(), cookie.getValue());
-                if ("access_token".equals(cookie.getName())) {
-                    jwt = cookie.getValue();
-                }
-            }
-        } else {
-            log.warn("Request to {} has NO COOKIES!", requestPath);
-        }
 
         // 3. Ưu tiên lấy từ Header Authorization
         final String authHeader = request.getHeader("Authorization");
@@ -70,13 +69,23 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         // 4. Nếu Header không có, tìm trong Cookie
-        if (jwt == null && request.getCookies() != null) {
-            for (Cookie cookie : request.getCookies()) {
-                if ("access_token".equals(cookie.getName())) {
-                    jwt = cookie.getValue();
-                    log.info("✅ JWT found in Cookie");
-                    break;
+        if (jwt == null) {
+            if (request.getCookies() != null) {
+                log.info("🍪 Found {} cookies in request", request.getCookies().length);
+                for (Cookie cookie : request.getCookies()) {
+                    log.info("🍪 Cookie: name={}, value={}, domain={}, path={}", 
+                        cookie.getName(), 
+                        cookie.getValue().substring(0, Math.min(20, cookie.getValue().length())) + "...",
+                        cookie.getDomain(),
+                        cookie.getPath());
+                    if ("access_token".equals(cookie.getName())) {
+                        jwt = cookie.getValue();
+                        log.info("✅ JWT found in Cookie");
+                        break;
+                    }
                 }
+            } else {
+                log.warn("🍪 No cookies found in request");
             }
         }
 

@@ -27,7 +27,15 @@ public class AuthCookieManager {
         cookie.setPath("/");
         cookie.setDomain(domain);
         cookie.setMaxAge(maxAge);
-        response.addCookie(cookie);
+        // response.addCookie(cookie);
+
+        response.setHeader("Set-Cookie", 
+            String.format("access_token=%s; Max-Age=%d; Path=/; Domain=%s; %s; %s; SameSite=None",
+                token, 
+                maxAge, 
+                domain,
+                httpOnly ? "HttpOnly" : "",
+                secure ? "Secure" : ""));
     }
 
     public void addRefreshTokenCookie(HttpServletResponse response, String token) {
@@ -37,7 +45,14 @@ public class AuthCookieManager {
         cookie.setPath("/api/v1/auth/refresh"); // Chỉ gửi lên endpoint refresh
         cookie.setDomain(domain);
         cookie.setMaxAge(maxAge * 7); // 7 ngày
-        response.addCookie(cookie);
+        // response.addCookie(cookie);
+        response.addHeader("Set-Cookie", 
+            String.format("refresh_token=%s; Max-Age=%d; Path=/api/v1/auth/refresh; Domain=%s; %s; %s; SameSite=None",
+                token, 
+                maxAge * 7, 
+                domain,
+                httpOnly ? "HttpOnly" : "",
+                secure ? "Secure" : ""));
     }
 
     public void clearCookies(HttpServletResponse response) {
