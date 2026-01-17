@@ -27,25 +27,35 @@ services:
     restart: always
     environment:
       - SPRING_PROFILES_ACTIVE=dev
-      # Database
+      
+      # --- DATABASE (Postgres) ---
       - DB_HOST=postgres
+      - DB_PORT=5432       # ✅ Đã fix lúc nãy
       - DB_NAME=video_call_db
       - DB_USERNAME=postgres
       - DB_PASSWORD=${DB_PASSWORD}
-      # Mongo
+
+      # --- MONGODB (Thêm MONGO_PORT và MONGO_DB) ---
       - MONGO_HOST=mongo
+      - MONGO_PORT=27017             
+      - MONGO_DB=meeting_history_db  
       - MONGO_USER=root
       - MONGO_PASSWORD=${MONGO_PASSWORD}
-      # Redis
+
+      # --- REDIS (Thêm REDIS_PORT cho chắc ăn luôn) ---
       - REDIS_HOST=redis
-      # Security & Config
+      - REDIS_PORT=6379              
+
+      # --- SECURITY & CONFIG ---
       - JWT_SECRET_KEY=${JWT_SECRET_KEY}
       - COOKIE_DOMAIN=${COOKIE_DOMAIN}
       - COOKIE_SECURE=true
-      # Email
+      
+      # --- EMAIL ---
       - MAIL_USERNAME=${MAIL_USERNAME}
       - MAIL_PASSWORD=${MAIL_PASSWORD}
-      # LiveKit
+      
+      # --- LIVEKIT ---
       - LIVEKIT_URL=${LIVEKIT_URL}
       - LIVEKIT_API_KEY=${LIVEKIT_API_KEY}
       - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET}
@@ -67,7 +77,7 @@ services:
 
   # --- 4. LiveKit Server ---
   livekit:
-    image: livekit/livekit-server:latest
+    image: livekit/livekit-server:v1.9.9
     command: --config /etc/livekit.yaml
     restart: unless-stopped
     ports:

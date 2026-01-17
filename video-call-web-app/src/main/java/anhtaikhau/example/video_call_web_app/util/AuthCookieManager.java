@@ -41,22 +41,31 @@ public class AuthCookieManager {
     }
 
     public void clearCookies(HttpServletResponse response) {
-        // 1. Xóa Access Token
-        Cookie cookie = new Cookie("access_token", null); // Value null cũng được
-        cookie.setPath("/");
-        cookie.setDomain(domain); // <--- BẮT BUỘC PHẢI CÓ VÀ GIỐNG LÚC TẠO
-        cookie.setSecure(secure); // <--- NÊN CÓ CHO ĐỒNG BỘ
-        cookie.setHttpOnly(httpOnly); 
-        cookie.setMaxAge(0);      // <--- Đây là lệnh xóa
-        response.addCookie(cookie);
+        // 1. Xóa Access Token với path="/"
+        Cookie accessCookie1 = new Cookie("access_token", "");
+        accessCookie1.setPath("/");
+        accessCookie1.setDomain(domain);
+        accessCookie1.setSecure(secure);
+        accessCookie1.setHttpOnly(httpOnly); 
+        accessCookie1.setMaxAge(0);
+        response.addCookie(accessCookie1);
         
-        // 2. Xóa Refresh Token
-        Cookie refreshCookie = new Cookie("refresh_token", null);
+        // 2. Xóa Refresh Token với path="/api/v1/auth/refresh"
+        Cookie refreshCookie = new Cookie("refresh_token", "");
         refreshCookie.setPath("/api/v1/auth/refresh");
-        refreshCookie.setDomain(domain); // <--- BẮT BUỘC PHẢI CÓ
+        refreshCookie.setDomain(domain);
         refreshCookie.setSecure(secure);
         refreshCookie.setHttpOnly(httpOnly);
         refreshCookie.setMaxAge(0);
         response.addCookie(refreshCookie);
+        
+        // 3. Xóa Refresh Token với path="/" (phòng trường hợp cũ)
+        Cookie refreshCookie2 = new Cookie("refresh_token", "");
+        refreshCookie2.setPath("/");
+        refreshCookie2.setDomain(domain);
+        refreshCookie2.setSecure(secure);
+        refreshCookie2.setHttpOnly(httpOnly);
+        refreshCookie2.setMaxAge(0);
+        response.addCookie(refreshCookie2);
     }
 }

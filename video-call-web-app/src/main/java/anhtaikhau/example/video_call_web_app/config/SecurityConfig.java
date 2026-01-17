@@ -48,8 +48,10 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(auth -> auth
                 // 1. Các API Public (Giữ nguyên)
-                .requestMatchers("/api/v1/auth/**", "/api/v1/users/registration", "/api/v1/users/verify").permitAll()
+                .requestMatchers("/api/v1/auth/sign-in", "/api/v1/auth/logout", "/api/v1/users/registration", "/api/v1/users/verify").permitAll()
                 .requestMatchers("/api/rooms/**", "/api/webhook/**").permitAll()
+                // Cho phép WebSocket endpoint
+                .requestMatchers("/ws/**").permitAll()
 
                 // 2. --- LUẬT BẢO MẬT MỚI CHO ADMIN ---
                 // Chỉ user có Role ADMIN mới được vào

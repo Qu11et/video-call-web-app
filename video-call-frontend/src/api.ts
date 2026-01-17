@@ -214,12 +214,14 @@ export const authApi = {
   // HÀM MỚI: Logout
   logout: async (): Promise<{ success: boolean }> => {
     try {
-      await fetch(`${API_BASE}/auth/logout`, {
+      const response = await fetch(`${API_BASE}/auth/logout`, {
         method: 'POST',
+        credentials: 'include', // Đảm bảo gửi cookies
       });
-      // Không cần quan tâm response body, miễn gọi thành công là cookie bay màu
-      return { success: true };
+      // Cookie sẽ được xóa bởi backend
+      return { success: response.ok };
     } catch (error) {
+      console.error('Logout error:', error);
       return { success: false };
     }
   }
