@@ -15,28 +15,43 @@ env:
   GITOPS_REPO: Qu11et/video-call-web-argocd
 
 jobs:
-  deploy:
-    name: Update GitOps Repo
+  build-and-deploy:
+    name: Build, Push & Deploy
     runs-on: ubuntu-latest
+    permissions:
+      contents: 'read'
+      id-token: 'write'
     
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 2
 
-      # ⭐ LẤY SHA CỦA PR COMMIT
-      - name: Get PR commit SHA
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Configure Docker
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
+
+      - name: Set Short SHA
         id: vars
         run: |
-          if [ $(git rev-list --parents -n 1 HEAD | wc -w) -gt 2 ]; then
-            PR_SHA=$(git rev-parse HEAD^2)
-          else
-            PR_SHA=$(git rev-parse HEAD)
-          fi
-          
-          echo "sha_short=$(echo $PR_SHA | cut -c1-7)" >> $GITHUB_OUTPUT
-          echo "📦 Using image tag: $(echo $PR_SHA | cut -c1-7)"
+          echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          echo "📦 Building image with tag: $(git rev-parse --short HEAD)"
+
+      - name: Build Docker Image
+        env:
+          IMAGE_TAG: ${{ steps.vars.outputs.sha_short }}
+        run: |
+          FULL_IMAGE_NAME="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG}"
+          echo "FULL_IMAGE_NAME=$FULL_IMAGE_NAME" >> $GITHUB_ENV
+          docker build -t $FULL_IMAGE_NAME ${{ env.DOCKER_BUILD_CONTEXT }}
+
+      - name: Push Docker Image
+        run: |
+          echo "🚀 Pushing image: ${{ env.FULL_IMAGE_NAME }}"
+          docker push ${{ env.FULL_IMAGE_NAME }}
 
       - name: Update GitOps Repo
         env:
