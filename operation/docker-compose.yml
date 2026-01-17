@@ -1,72 +1,69 @@
 version: '3.8'
 
 services:
-  # --- 1. Nginx Proxy Manager (Cổng chính - Gateway) ---
+  # --- 1. Nginx Proxy Manager ---
   npm:
     image: 'jc21/nginx-proxy-manager:latest'
     restart: unless-stopped
     ports:
-      - '80:80'     # Cổng Web HTTP
-      - '81:81'     # Cổng Admin quản lý
-      - '443:443'   # Cổng Web HTTPS (SSL)
+      - '80:80'
+      - '81:81'
+      - '443:443'
     volumes:
       - ./data:/data
       - ./letsencrypt:/etc/letsencrypt
     depends_on:
-      - frontend-container
+      - frontend  # Đã sửa tên khớp với service bên dưới
       - livekit
     networks:
-      - app-network  
+      - app-network
 
   # --- 2. Backend Service ---
-  version: '3.8'
-  services:
-    backend:
-      image: ${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${GCP_REPO_NAME}/video-call-backend:${BACKEND_TAG}
-      ports:
-        - "8080:8080"
-      restart: always
-      # 👇 KHAI BÁO CÁC BIẾN MÔI TRƯỜNG Ở ĐÂY
-      environment:
-        - SPRING_PROFILES_ACTIVE=dev
-        # Database
-        - DB_HOST=postgres
-        - DB_NAME=video_call_db
-        - DB_USERNAME=postgres
-        - DB_PASSWORD=${DB_PASSWORD} # Lấy từ file .env
-        # Mongo
-        - MONGO_HOST=mongo
-        - MONGO_USER=root
-        - MONGO_PASSWORD=${MONGO_PASSWORD} # Lấy từ file .env
-        # Redis
-        - REDIS_HOST=redis
-        # Security & Config
-        - JWT_SECRET_KEY=${JWT_SECRET_KEY}
-        - COOKIE_DOMAIN=${COOKIE_DOMAIN}
-        - COOKIE_SECURE=true
-        # Email
-        - MAIL_USERNAME=${MAIL_USERNAME}
-        - MAIL_PASSWORD=${MAIL_PASSWORD}
-        # LiveKit
-        - LIVEKIT_URL=${LIVEKIT_URL}
-        - LIVEKIT_API_KEY=${LIVEKIT_API_KEY}
-        - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET}
+  # ĐÃ XÓA DÒNG 'version' VÀ 'services' THỪA Ở ĐÂY
+  backend:
+    image: ${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${GCP_REPO_NAME}/video-call-backend:${BACKEND_TAG}
+    ports:
+      - "8080:8080"
+    restart: always
+    environment:
+      - SPRING_PROFILES_ACTIVE=dev
+      # Database
+      - DB_HOST=postgres
+      - DB_NAME=video_call_db
+      - DB_USERNAME=postgres
+      - DB_PASSWORD=${DB_PASSWORD}
+      # Mongo
+      - MONGO_HOST=mongo
+      - MONGO_USER=root
+      - MONGO_PASSWORD=${MONGO_PASSWORD}
+      # Redis
+      - REDIS_HOST=redis
+      # Security & Config
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - COOKIE_DOMAIN=${COOKIE_DOMAIN}
+      - COOKIE_SECURE=true
+      # Email
+      - MAIL_USERNAME=${MAIL_USERNAME}
+      - MAIL_PASSWORD=${MAIL_PASSWORD}
+      # LiveKit
+      - LIVEKIT_URL=${LIVEKIT_URL}
+      - LIVEKIT_API_KEY=${LIVEKIT_API_KEY}
+      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET}
     depends_on:
       - redis
     networks:
-      - app-network  
+      - app-network
 
   # --- 3. Frontend Service ---
-  frontend-container:
+  frontend: # Đã đổi tên từ 'frontend-container' cho gọn
     image: ${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${GCP_REPO_NAME}/video-call-frontend:${FRONTEND_TAG}
     restart: always
-    # KHÔNG expose port 80 ra ngoài nữa, chỉ chạy trong mạng Docker
     expose:
-      - "80" 
+      - "80"
     depends_on:
-      - backend-container
+      - backend # Đã sửa tên khớp với service backend ở trên
     networks:
-      - app-network  
+      - app-network
 
   # --- 4. LiveKit Server ---
   livekit:
@@ -77,14 +74,13 @@ services:
       - "7880:7880"
       - "7881:7881"
       - "7882:7882/udp"
-      # QUAN TRỌNG: Mở dải port UDP cho Video Stream
       - "50000-50100:50000-50100/udp"
     volumes:
       - ./livekit.yaml:/etc/livekit.yaml
     depends_on:
       - redis
     networks:
-      - app-network  
+      - app-network
 
   # --- 5. Redis ---
   redis:
@@ -93,10 +89,7 @@ services:
     networks:
       - app-network
 
-# Định nghĩa network chung để các container nhìn thấy nhau
+# Network dùng chung
 networks:
   app-network:
-    driver: bridge
     external: true
-
-      
