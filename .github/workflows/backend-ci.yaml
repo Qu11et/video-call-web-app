@@ -84,11 +84,22 @@ jobs:
       
       - name: Build and Analyze with SonarCloud
         env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         working-directory: ${{ env.DOCKER_BUILD_CONTEXT }}
         run: |
-          # ...existing sonar command...
-
+          mvn -B verify org.sonarsource.scanner.maven:sonar-maven-plugin:sonar \
+          -Dsonar.login=${{ secrets.SONAR_TOKEN }} \
+          -Dspring.datasource.url=jdbc:postgresql://localhost:5432/video_call_db \
+          -Dspring.datasource.username=postgres \
+          -Dspring.datasource.password=password123 \
+          -Dspring.data.redis.host=localhost \
+          -Dspring.data.redis.port=6379 \
+          -Dspring.data.mongodb.uri="mongodb://root:password123@localhost:27017/meeting_history_db?authSource=admin" \
+          -Dlivekit.url=ws://localhost:7880 \
+          -Dlivekit.api.key=devkey \
+          -Dlivekit.api.secret=secret
+        
   build-and-push:
     name: Build, Scan & Push
     needs: check-quality-and-security
