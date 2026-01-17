@@ -1,0 +1,78 @@
+name: Backend CI Build & Push
+
+on:
+  push:
+    branches: [ "dev" ]
+    paths:
+      - 'video-call-fronten/**'       # <--- CHỈ chạy khi có thay đổi trong thư mục frontend
+      - '.github/workflows/fronten-ci-dev.yaml' # Nên chạy khi sửa file workflow này
+  pull_request:
+    branches: [ "dev" ]
+    paths:
+      - 'video-call-frontend/**'
+
+env:
+  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  REGION: asia-southeast1
+  REPO_NAME: video-call-repo
+  # Đặt tên image riêng cho frontend
+  IMAGE_NAME: video-call-frontend 
+  GITOPS_REPO: Qu11et/video-call-web-argocd
+
+jobs:
+  build-push-frontend:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+
+    steps:
+      - name: Checkout Application Code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Configure Docker
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
+
+      - name: Set Short SHA
+        id: vars
+        run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+      # --- BUILD & PUSH FRONTEND ---
+      - name: Build and Push Frontend Image
+        env:
+          IMAGE_TAG: ${{ steps.vars.outputs.sha_short }}
+        run: |
+          DOCKER_IMAGE="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG}"
+          
+          docker build -t $DOCKER_IMAGE ./video-call-frontend
+          docker push $DOCKER_IMAGE
+
+      # --- UPDATE GITOPS CHO FRONTEND ---
+      - name: Update GitOps Repository (Frontend)
+        if: github.event_name == 'push'
+        env:
+          GITOPS_TOKEN: ${{ secrets.GITOPS_TOKEN }}
+          IMAGE_TAG: ${{ steps.vars.outputs.sha_short }}
+        run: |
+          git config --global user.email "ci-bot@example.com"
+          git config --global user.name "CI Bot"
+          
+          git clone https://x-access-token:${GITOPS_TOKEN}@github.com/${{ env.GITOPS_REPO }}.git
+          cd video-call-web-argocd/overlays/prod
+
+          # Quan trọng: Chỉ update image của frontend-service
+          # Giả sử trong kustomization.yaml bạn đặt tên service là 'frontend-app'
+          kustomize edit set image frontend-app=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG}
+          
+          git add .
+          # Kiểm tra xem có gì thay đổi không trước khi commit để tránh lỗi empty commit
+          if ! git diff-index --quiet HEAD; then
+            git commit -m "update(frontend): set image tag to ${IMAGE_TAG}"
+            git push origin main
+          fi
+      

@@ -23,5 +23,7 @@
 hs_err_pid*
 replay_pid*
 
-operation/*
+operation/data
+operation/letsencrypt
+operation/mongodata
 video-call-web-app/src/main/resources/
