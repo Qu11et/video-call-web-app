@@ -88,8 +88,6 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         working-directory: ${{ env.DOCKER_BUILD_CONTEXT }}
         run: |
-          cd video-call-web-app
-          # Chỉ cần truyền Token và các biến môi trường DB giả lập
           mvn -B verify org.sonarsource.scanner.maven:sonar-maven-plugin:sonar \
           -Dsonar.login=${{ secrets.SONAR_TOKEN }} \
           -Dspring.datasource.url=jdbc:postgresql://localhost:5432/video_call_db \
