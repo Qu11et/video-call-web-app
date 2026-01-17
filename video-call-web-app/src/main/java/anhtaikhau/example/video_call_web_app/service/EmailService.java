@@ -17,7 +17,7 @@ public class EmailService {
     @Async // <--- QUAN TRỌNG: Chạy ở thread riêng, không làm chậm API đăng ký
     public void sendVerificationEmail(String toEmail, String token) {
         try {
-            String verifyUrl = "https://lkht.id.vn/verify-email?token=" + token;
+            String verifyUrl = "https://dev.lkht.id.vn/verify-email?token=" + token;
             
             SimpleMailMessage message = new SimpleMailMessage();
             message.setTo(toEmail);

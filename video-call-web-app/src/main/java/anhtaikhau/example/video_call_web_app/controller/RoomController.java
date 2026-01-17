@@ -81,7 +81,7 @@ public class RoomController {
         }
     }
 
-    @Value("${livekit.url:wss://livekit.lkht.id.vn}") // Đổi default thành wss
+    @Value("${livekit.url:wss://livekit.dev.lkht.id.vn}") // Đổi default thành wss
     private String liveKitUrl;
 
     /**

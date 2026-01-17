@@ -13,7 +13,7 @@ services:
       - ./data:/data
       - ./letsencrypt:/etc/letsencrypt
     depends_on:
-      - frontend  # Đã sửa tên khớp với service bên dưới
+      - frontend  
       - livekit
     networks:
       - app-network
