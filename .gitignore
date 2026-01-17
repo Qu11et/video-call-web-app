@@ -25,3 +25,5 @@ replay_pid*
 
 operation/*
 video-call-web-app/src/main/resources/
+github-action-key
+github-action-key.pub
