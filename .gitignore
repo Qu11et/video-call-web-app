@@ -23,7 +23,10 @@
 hs_err_pid*
 replay_pid*
 
-operation/data
-operation/letsencrypt
-operation/mongodata
-video-call-web-app/src/main/resources/
+operation/data/
+operation/letsencrypt/
+operation/mongodata/
+operation/.env
+github-action-key
+github-action-key.pub
+#video-call-web-app/src/main/resources/application.properties

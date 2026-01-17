@@ -19,14 +19,38 @@ services:
       - app-network  
 
   # --- 2. Backend Service ---
-  backend-container:
-    # Sử dụng biến môi trường, không hardcode phiên bản
-    image: ${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${GCP_REPO_NAME}/${GCP_IMAGE_NAME}:${IMAGE_TAG}
-    restart: always
-    environment:
-      - SERVER_PORT=8080
-      # Quan trọng: URL LiveKit giờ là wss://livekit.tenmien.com
-      - LIVEKIT_URL=ws://localhost:7880 
+  version: '3.8'
+  services:
+    backend:
+      image: ${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${GCP_REPO_NAME}/video-call-backend:${BACKEND_TAG}
+      ports:
+        - "8080:8080"
+      restart: always
+      # 👇 KHAI BÁO CÁC BIẾN MÔI TRƯỜNG Ở ĐÂY
+      environment:
+        - SPRING_PROFILES_ACTIVE=dev
+        # Database
+        - DB_HOST=postgres
+        - DB_NAME=video_call_db
+        - DB_USERNAME=postgres
+        - DB_PASSWORD=${DB_PASSWORD} # Lấy từ file .env
+        # Mongo
+        - MONGO_HOST=mongo
+        - MONGO_USER=root
+        - MONGO_PASSWORD=${MONGO_PASSWORD} # Lấy từ file .env
+        # Redis
+        - REDIS_HOST=redis
+        # Security & Config
+        - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+        - COOKIE_DOMAIN=${COOKIE_DOMAIN}
+        - COOKIE_SECURE=true
+        # Email
+        - MAIL_USERNAME=${MAIL_USERNAME}
+        - MAIL_PASSWORD=${MAIL_PASSWORD}
+        # LiveKit
+        - LIVEKIT_URL=${LIVEKIT_URL}
+        - LIVEKIT_API_KEY=${LIVEKIT_API_KEY}
+        - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET}
     depends_on:
       - redis
     networks:
@@ -34,7 +58,7 @@ services:
 
   # --- 3. Frontend Service ---
   frontend-container:
-    build: ../video-call-frontend
+    image: ${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${GCP_REPO_NAME}/video-call-frontend:${FRONTEND_TAG}
     restart: always
     # KHÔNG expose port 80 ra ngoài nữa, chỉ chạy trong mạng Docker
     expose:

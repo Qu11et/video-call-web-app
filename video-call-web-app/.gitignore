@@ -32,5 +32,4 @@ build/
 ### VS Code ###
 .vscode/
 
-video-call-web-app/src/main/resources/
-operation/*
+

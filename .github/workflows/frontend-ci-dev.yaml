@@ -1,35 +1,36 @@
-name: Backend CI Build & Push
+name: Frontend Deploy VM (GitOps Lite)
+
+concurrency:
+  group: deploy-vm-dev-frontend
+  cancel-in-progress: true
 
 on:
   push:
     branches: [ "dev" ]
     paths:
-      - 'video-call-fronten/**'       # <--- CHỈ chạy khi có thay đổi trong thư mục frontend
-      - '.github/workflows/fronten-ci-dev.yaml' # Nên chạy khi sửa file workflow này
-  pull_request:
-    branches: [ "dev" ]
-    paths:
-      - 'video-call-frontend/**'
+      - 'video-call-frontend/**' # Chỉ chạy khi sửa code frontend
+      - 'operation/**'
+      - '.github/workflows/frontend-ci-dev.yaml'
 
 env:
-  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  PROJECT_ID: ${{ vars.GCP_PROJECT_ID }} # Dùng Vars như đã cấu hình
   REGION: asia-southeast1
   REPO_NAME: video-call-repo
-  # Đặt tên image riêng cho frontend
-  IMAGE_NAME: video-call-frontend 
-  GITOPS_REPO: Qu11et/video-call-web-argocd
+  IMAGE_NAME: video-call-frontend # ✅ Tên Image Frontend
+  DEPLOY_PATH: /home/${{ secrets.GCP_VM_USER }}/video-call-web-app/operation/
 
 jobs:
-  build-push-frontend:
+  build-and-deploy:
     runs-on: ubuntu-latest
     permissions:
       contents: 'read'
       id-token: 'write'
 
     steps:
-      - name: Checkout Application Code
+      - name: Checkout Code
         uses: actions/checkout@v4
 
+      # --- 1. BUILD & PUSH FRONTEND ---
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
@@ -42,37 +43,72 @@ jobs:
         id: vars
         run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
 
-      # --- BUILD & PUSH FRONTEND ---
       - name: Build and Push Frontend Image
         env:
           IMAGE_TAG: ${{ steps.vars.outputs.sha_short }}
         run: |
-          DOCKER_IMAGE="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG}"
-          
-          docker build -t $DOCKER_IMAGE ./video-call-frontend
-          docker push $DOCKER_IMAGE
+          FULL_IMAGE="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG}"
+          # ✅ Build từ thư mục frontend
+          docker build -t $FULL_IMAGE ./video-call-frontend
+          docker push $FULL_IMAGE
 
-      # --- UPDATE GITOPS CHO FRONTEND ---
-      - name: Update GitOps Repository (Frontend)
-        if: github.event_name == 'push'
+      # --- 2. DEPLOY (UPDATE .env THÔNG MINH) ---
+      - name: Trigger Server Update
+        uses: appleboy/ssh-action@v1.0.3
         env:
-          GITOPS_TOKEN: ${{ secrets.GITOPS_TOKEN }}
           IMAGE_TAG: ${{ steps.vars.outputs.sha_short }}
-        run: |
-          git config --global user.email "ci-bot@example.com"
-          git config --global user.name "CI Bot"
-          
-          git clone https://x-access-token:${GITOPS_TOKEN}@github.com/${{ env.GITOPS_REPO }}.git
-          cd video-call-web-argocd/overlays/prod
+          PROJECT_ID: ${{ env.PROJECT_ID }}
+          REGION: ${{ env.REGION }}
+          REPO_NAME: ${{ env.REPO_NAME }}
+          IMAGE_NAME: ${{ env.IMAGE_NAME }}
+          DEPLOY_PATH: ${{ env.DEPLOY_PATH }}
+        with:
+          host: ${{ secrets.GCP_VM_HOST }}
+          username: ${{ secrets.GCP_VM_USER }}
+          key: ${{ secrets.GCP_VM_SSH_KEY }}
+          port: 22
+          envs: IMAGE_TAG,PROJECT_ID,REGION,REPO_NAME,IMAGE_NAME,DEPLOY_PATH
+          script: |
+            # 1. Pull code cấu hình mới nhất
+            cd $DEPLOY_PATH/../../
+            git fetch origin dev
+            git reset --hard origin/dev
+            
+            # 2. Vào thư mục deploy
+            cd $DEPLOY_PATH
 
-          # Quan trọng: Chỉ update image của frontend-service
-          # Giả sử trong kustomization.yaml bạn đặt tên service là 'frontend-app'
-          kustomize edit set image frontend-app=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG}
-          
-          git add .
-          # Kiểm tra xem có gì thay đổi không trước khi commit để tránh lỗi empty commit
-          if ! git diff-index --quiet HEAD; then
-            git commit -m "update(frontend): set image tag to ${IMAGE_TAG}"
-            git push origin main
-          fi
-      
+            # 3. Cập nhật file .env (Không được xóa biến của Backend!)
+            # Tạo file .env nếu chưa có
+            touch .env 
+            
+            # Cập nhật các biến chung (Ghi đè hoặc thêm mới nếu chưa có)
+            # Dùng grep để kiểm tra, nếu chưa có thì thêm, có rồi thì sửa (Logic hơi phức tạp nên ta dùng cách "Xóa rồi Thêm")
+            
+            # Hàm cập nhật biến an toàn
+            update_env() {
+              key=$1
+              val=$2
+              # Xóa dòng cũ chứa key này (nếu có)
+              sed -i "/^$key=/d" .env
+              # Thêm dòng mới vào cuối file
+              echo "$key=$val" >> .env
+            }
+
+            # Cập nhật các biến chung
+            update_env "GCP_PROJECT_ID" "$PROJECT_ID"
+            update_env "GCP_REGION" "$REGION"
+            update_env "GCP_REPO_NAME" "$REPO_NAME"
+            
+            # ✅ QUAN TRỌNG: Chỉ cập nhật FRONTEND_TAG
+            update_env "FRONTEND_TAG" "$IMAGE_TAG"
+            # (Lưu ý: BACKEND_TAG trong file .env sẽ được giữ nguyên)
+
+            echo "--- Content of .env ---"
+            cat .env
+
+            # 4. Deploy Frontend
+            # Chỉ pull và up service frontend để tiết kiệm thời gian
+            docker compose pull frontend
+            docker compose up -d --remove-orphans frontend
+            
+            docker image prune -f
