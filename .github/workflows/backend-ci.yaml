@@ -99,26 +99,15 @@ jobs:
           -Dlivekit.url=ws://localhost:7880 \
           -Dlivekit.api.key=devkey \
           -Dlivekit.api.secret=secret
-        
-  build-and-push:
-    name: Build, Scan & Push
+
+  build-and-scan:
+    name: Build & Security Scan
     needs: check-quality-and-security
     runs-on: ubuntu-latest
-    permissions:
-      contents: 'read'
-      id-token: 'write'
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
-
-      - name: Authenticate to Google Cloud
-        uses: google-github-actions/auth@v2
-        with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
-
-      - name: Configure Docker
-        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
 
       - name: Set Short SHA
         id: vars
@@ -130,6 +119,7 @@ jobs:
         run: |
           FULL_IMAGE_NAME="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG}"
           echo "FULL_IMAGE_NAME=$FULL_IMAGE_NAME" >> $GITHUB_ENV
+          echo "🔨 Building image: $FULL_IMAGE_NAME"
           docker build -t $FULL_IMAGE_NAME ${{ env.DOCKER_BUILD_CONTEXT }}
 
       - name: Run Trivy vulnerability scanner
@@ -142,6 +132,4 @@ jobs:
           vuln-type: 'os,library'
           severity: 'CRITICAL'
 
-      # PUSH IMAGE NGAY KHI BUILD XONG (trong PR)
-      - name: Push Docker Image
-        run: docker push ${{ env.FULL_IMAGE_NAME }}
+      # ℹ️ Image được build nhưng KHÔNG push trong CI
