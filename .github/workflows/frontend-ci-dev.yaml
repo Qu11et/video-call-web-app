@@ -13,7 +13,7 @@ on:
       - '.github/workflows/frontend-ci-dev.yaml'
 
 env:
-  PROJECT_ID: ${{ vars.GCP_PROJECT_ID }} # Dùng Vars như đã cấu hình
+  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }} # Dùng Vars như đã cấu hình
   REGION: asia-southeast1
   REPO_NAME: video-call-repo
   IMAGE_NAME: video-call-frontend # ✅ Tên Image Frontend
