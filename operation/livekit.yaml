@@ -16,3 +16,11 @@ keys:
 
 logging:
   level: info
+
+# Thêm cấu hình Webhook
+webhook:
+    # Thay bằng domain của bạn. Lưu ý phải là đường dẫn Backend
+    # Vì backend chạy port 8080 và được Nginx Proxy Manager trỏ /api vào
+    urls:
+        - "https://dev.lkht.id.vn/api/webhook/livekit" 
+    api_key: "devkey" # Key dùng để ký webhook

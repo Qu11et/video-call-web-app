@@ -122,20 +122,18 @@ jobs:
             update_env "LIVEKIT_API_SECRET" "$LIVEKIT_API_SECRET"
             update_env "COOKIE_DOMAIN" "$COOKIE_DOMAIN"
 
-            # Step 1: Khởi động database services (postgres, mongo, pgadmin)
-            echo "🗄️ Starting database services..."
+            # Bỏ sleep, chỉ cần up tất cả cùng lúc
+            echo "🚀 Starting all services..."
+            cd $DEPLOY_PATH
+            
+            # Up databases trước (nếu chưa chạy)
             docker compose -f docker-compose.postgres.yml up -d
             
-            # Chờ database khởi động hoàn toàn
-            echo "⏳ Waiting for databases to be ready..."
-            sleep 10
-
-            # Step 2: Deploy Backend và các services chính
-            echo "🚀 Deploying backend and main services..."
+            # Pull backend image mới
             docker compose pull backend
-            docker compose up -d --remove-orphans backend
             
-            # Cleanup unused images
+            # Up backend NHƯNG KHÔNG dùng --remove-orphans (để giữ databases)
+            docker compose up -d backend
+            
             docker image prune -f
-            
             echo "✅ Deployment completed!"
