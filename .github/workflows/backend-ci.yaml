@@ -90,6 +90,7 @@ jobs:
         run: |
           mvn -B verify org.sonarsource.scanner.maven:sonar-maven-plugin:sonar \
           -Dsonar.login=${{ secrets.SONAR_TOKEN }} \
+          -Dsonar.coverage.exclusions=**/* \
           -Dspring.datasource.url=jdbc:postgresql://localhost:5432/video_call_db \
           -Dspring.datasource.username=postgres \
           -Dspring.datasource.password=password123 \

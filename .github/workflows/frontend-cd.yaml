@@ -13,6 +13,7 @@ env:
   REPO_NAME: video-call-repo
   IMAGE_NAME: video-call-frontend
   GITOPS_REPO: Qu11et/video-call-web-argocd
+  DOCKER_BUILD_CONTEXT: ./video-call-frontend
 
 jobs:
   build-and-deploy:
