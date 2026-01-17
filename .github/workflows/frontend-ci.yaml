@@ -1,10 +1,10 @@
-name: Frontend CI/CD Pipeline (Sonar + Trivy + Build + GitOps)
+name: Frontend CI/CD Pipeline (Sonar + Trivy + Build)
 
 on:
-  push:
+  pull_request:
     branches: [ "main" ]
     paths:
-      - 'video-call-frontend/**'           # Chỉ chạy khi code frontend thay đổi
+      - 'video-call-frontend/**'
       - '.github/workflows/frontend-ci.yaml'
 
 env:
@@ -94,32 +94,4 @@ jobs:
       - name: Push Docker Image
         run: docker push ${{ env.FULL_IMAGE_NAME }}
 
-      # --- 3. UPDATE GITOPS (Dùng yq thay vì kustomize) ---
-      - name: Update GitOps Repo
-        if: github.event_name == 'push'
-        env:
-          GITOPS_TOKEN: ${{ secrets.GITOPS_TOKEN }}
-        run: |
-          # Cấu hình Git
-          git config --global user.email "ci-bot@example.com"
-          git config --global user.name "CI Bot"
-          
-          # Clone Repo GitOps
-          git clone https://x-access-token:${GITOPS_TOKEN}@github.com/${{ env.GITOPS_REPO }}.git
-          cd video-call-web-argocd
-          
-          # Cài đặt yq
-          wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/bin/yq && chmod +x /usr/bin/yq
-          
-          # SỬA FILE 2-app.yaml TRỰC TIẾP
-          # Tìm Deployment tên là "frontend" và update image
-          yq -i 'select(.kind == "Deployment" and .metadata.name == "frontend").spec.template.spec.containers[0].image = "${{ env.FULL_IMAGE_NAME }}"' web-app/2-app.yaml
-          
-          # Commit & Push
-          git add .
-          if ! git diff-index --quiet HEAD; then
-            git commit -m "update(frontend): set image to ${{ steps.vars.outputs.sha_short }}"
-            git push origin main
-          else
-            echo "No changes to commit"
-          fi
+      

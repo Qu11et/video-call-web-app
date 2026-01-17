@@ -1,7 +1,8 @@
 name: Backend CI/CD Pipeline (Sonar + Trivy + Build + GitOps)
 
 on:
-  push:
+  # CHỈ TRIGGER KHI CÓ PULL REQUEST
+  pull_request:
     branches: [ "main" ]
     paths:
       - 'video-call-web-app/**'
@@ -67,15 +68,12 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Set up JDK 17
         uses: actions/setup-java@v3
         with:
-          java-version: 17
+          java-version: '17'
           distribution: 'temurin'
-          cache: maven
       
       - name: Cache SonarCloud packages
         uses: actions/cache@v3
@@ -85,29 +83,15 @@ jobs:
           restore-keys: ${{ runner.os }}-sonar
       
       - name: Build and Analyze with SonarCloud
-        # ✅ GHI ĐÈ CẤU HÌNH ĐỂ TRỎ VỀ LOCALHOST.
-        # Lúc này localhost chính là các service containers đã tạo ở trên
-        run: |
-          cd video-call-web-app
-          # Chỉ cần truyền Token và các biến môi trường DB giả lập
-          mvn -B verify org.sonarsource.scanner.maven:sonar-maven-plugin:sonar \
-          -Dsonar.login=${{ secrets.SONAR_TOKEN }} \
-          -Dspring.datasource.url=jdbc:postgresql://localhost:5432/video_call_db \
-          -Dspring.datasource.username=postgres \
-          -Dspring.datasource.password=password123 \
-          -Dspring.data.redis.host=localhost \
-          -Dspring.data.redis.port=6379 \
-          -Dspring.data.mongodb.uri="mongodb://root:password123@localhost:27017/meeting_history_db?authSource=admin" \
-          -Dlivekit.url=ws://localhost:7880 \
-          -Dlivekit.api.key=devkey \
-          -Dlivekit.api.secret=secret
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        working-directory: ${{ env.DOCKER_BUILD_CONTEXT }}
+        run: |
+          # ...existing sonar command...
 
   build-and-push:
     name: Build, Scan & Push
-    # needs: check-quality-and-security
+    needs: check-quality-and-security
     runs-on: ubuntu-latest
     permissions:
       contents: 'read'
@@ -145,26 +129,8 @@ jobs:
           exit-code: '1'
           ignore-unfixed: true
           vuln-type: 'os,library'
-          severity: 'CRITICAL' #,HIGH'
+          severity: 'CRITICAL'
 
+      # PUSH IMAGE NGAY KHI BUILD XONG (trong PR)
       - name: Push Docker Image
         run: docker push ${{ env.FULL_IMAGE_NAME }}
-
-      - name: Update GitOps Repo
-        if: github.event_name == 'push'
-        env:
-          GITOPS_TOKEN: ${{ secrets.GITOPS_TOKEN }}
-        run: |
-          git config --global user.email "ci-bot@example.com"
-          git config --global user.name "CI Bot"
-          git clone https://x-access-token:${GITOPS_TOKEN}@github.com/${{ env.GITOPS_REPO }}.git
-          cd video-call-web-argocd
-          wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/bin/yq && chmod +x /usr/bin/yq
-          yq -i 'select(.kind == "Deployment" and .metadata.name == "backend").spec.template.spec.containers[0].image = "${{ env.FULL_IMAGE_NAME }}"' web-app/2-app.yaml
-          git add .
-          if ! git diff-index --quiet HEAD; then
-            git commit -m "update(backend): set image to ${{ steps.vars.outputs.sha_short }}"
-            git push origin main
-          else
-            echo "No changes to commit"
-          fi
