@@ -22,10 +22,24 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 2  
 
-      - name: Get merged PR commit SHA
+      # LẤY SHA CỦA COMMIT TRƯỚC KHI MERGE (PR commit)
+      - name: Get PR commit SHA
         id: vars
-        run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+        run: |
+          # Nếu là merge commit, lấy parent commit đầu tiên (PR commit)
+          if [ $(git rev-list --parents -n 1 HEAD | wc -w) -gt 2 ]; then
+            # Merge commit có 2+ parents, lấy parent thứ 2 (PR branch)
+            PR_SHA=$(git rev-parse HEAD^2)
+          else
+            # Fast-forward merge, lấy HEAD
+            PR_SHA=$(git rev-parse HEAD)
+          fi
+          
+          echo "sha_short=$(echo $PR_SHA | cut -c1-7)" >> $GITHUB_OUTPUT
+          echo "📦 Using image tag: $(echo $PR_SHA | cut -c1-7)"
 
       - name: Update GitOps Repo
         env:
@@ -34,20 +48,28 @@ jobs:
         run: |
           FULL_IMAGE_NAME="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG}"
           
+          echo "🚀 Deploying image: ${FULL_IMAGE_NAME}"
+          
           git config --global user.email "ci-bot@example.com"
           git config --global user.name "CI Bot"
           
           git clone https://x-access-token:${GITOPS_TOKEN}@github.com/${{ env.GITOPS_REPO }}.git
           cd video-call-web-argocd
           
-          wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/bin/yq && chmod +x /usr/bin/yq
+          sudo wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/bin/yq && sudo chmod +x /usr/bin/yq
           
           yq -i "select(.kind == \"Deployment\" and .metadata.name == \"backend\").spec.template.spec.containers[0].image = \"${FULL_IMAGE_NAME}\"" web-app/2-app.yaml
           
           git add .
           if ! git diff-index --quiet HEAD; then
             git commit -m "deploy(backend): update image to ${IMAGE_TAG}"
-            git push origin main
+            
+            # ⭐ RETRY LOGIC
+            for i in {1..3}; do
+              git pull --rebase origin main && git push origin main && break
+              echo "⚠️  Push failed, retrying ($i/3)..."
+              sleep 2
+            done
           else
-            echo "No changes to commit"
+            echo "ℹ️  No changes to commit"
           fi
