@@ -1,6 +1,5 @@
 name: Backend Deploy VM (GitOps Lite)
 
-# ✅ QUAN TRỌNG: Ngăn chặn deploy chồng chéo
 concurrency:
   group: deploy-vm-dev
   cancel-in-progress: true
@@ -10,15 +9,15 @@ on:
     branches: [ "dev" ]
     paths:
       - 'video-call-web-app/**'
-      - 'operation/**' # Chạy khi sửa file deploy
+      - 'operation/**'
       - '.github/workflows/backend-ci-dev.yaml'
 
 env:
-  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  PROJECT_ID: ${{ vars.GCP_PROJECT_ID }} # Dùng Vars cho linh hoạt
   REGION: asia-southeast1
   REPO_NAME: video-call-repo
   IMAGE_NAME: video-call-backend
-  # Đường dẫn tới thư mục chứa docker-compose trên VM (đã clone ở Bước 3)
+  # Đường dẫn này ĐÚNG rồi, giữ nguyên
   DEPLOY_PATH: /home/${{ secrets.GCP_VM_USER }}/video-call-web-app/operation/
 
 jobs:
@@ -32,7 +31,7 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # --- 1. BUILD & PUSH IMAGE (Giữ nguyên) ---
+      # --- 1. BUILD & PUSH IMAGE ---
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
@@ -53,19 +52,17 @@ jobs:
           docker build -t $FULL_IMAGE ./video-call-web-app
           docker push $FULL_IMAGE
 
-      # --- 2. DEPLOY (GITOPS LITE - FULL VARIABLES) ---
+      # --- 2. DEPLOY ---
       - name: Trigger Server Pull & Update
         uses: appleboy/ssh-action@v1.0.3
         env:
-          # Truyền các biến từ Workflow vào Action
           IMAGE_TAG: ${{ steps.vars.outputs.sha_short }}
           PROJECT_ID: ${{ env.PROJECT_ID }}
           REGION: ${{ env.REGION }}
           REPO_NAME: ${{ env.REPO_NAME }}
           IMAGE_NAME: ${{ env.IMAGE_NAME }}
           DEPLOY_PATH: ${{ env.DEPLOY_PATH }}
-
-          # 👇 CÁC BIẾN MẬT (Lấy từ Secrets)
+          # ... (Các secret khác giữ nguyên như bạn đã làm) ...
           DB_PASSWORD: ${{ secrets.APP_DB_PASSWORD }}
           MONGO_PASSWORD: ${{ secrets.APP_MONGO_PASSWORD }}
           JWT_SECRET_KEY: ${{ secrets.APP_JWT_SECRET }}
@@ -80,34 +77,41 @@ jobs:
           username: ${{ secrets.GCP_VM_USER }}
           key: ${{ secrets.GCP_VM_SSH_KEY }}
           port: 22
-          # 👇 Đừng quên liệt kê tên biến vào đây
           envs: IMAGE_TAG,PROJECT_ID,REGION,REPO_NAME,IMAGE_NAME,DEPLOY_PATH,DB_PASSWORD,MONGO_PASSWORD,JWT_SECRET_KEY,MAIL_USERNAME,MAIL_PASSWORD,LIVEKIT_URL,LIVEKIT_API_KEY,LIVEKIT_API_SECRET,COOKIE_DOMAIN
           script: |
-            cd $DEPLOY_PATH/../../
+            # ✅ SỬA 1: Chỉ lùi 1 cấp để về Git Root (/home/user/video-call-web-app/)
+            cd $DEPLOY_PATH/..
+            
+            echo "Pulling latest code..."
             git fetch origin dev
             git reset --hard origin/dev
             
+            # Vào lại thư mục chứa docker-compose
             cd $DEPLOY_PATH
 
-            # Đảm bảo file .env tồn tại
             touch .env
 
-            # Hàm cập nhật biến an toàn
             update_env() {
               key=$1
               val=$2
-              # Xóa dòng cũ và thêm dòng mới
               sed -i "/^$key=/d" .env
               echo "$key=$val" >> .env
             }
 
-            # --- CẬP NHẬT BIẾN CẤU HÌNH HẠ TẦNG ---
+            # Cập nhật Config
             update_env "GCP_PROJECT_ID" "$PROJECT_ID"
             update_env "GCP_REGION" "$REGION"
             update_env "GCP_REPO_NAME" "$REPO_NAME"
+            
+            # ✅ Cập nhật BACKEND
             update_env "BACKEND_TAG" "$IMAGE_TAG"
 
-            # --- CẬP NHẬT BIẾN MÔI TRƯỜNG APP (APP SECRETS) ---
+            # ✅ SỬA 2: Kiểm tra FRONTEND_TAG để tránh lỗi
+            if ! grep -q "FRONTEND_TAG=" .env; then
+               echo "FRONTEND_TAG=latest" >> .env
+            fi
+
+            # Cập nhật Secrets (Giữ nguyên phần của bạn)
             update_env "DB_PASSWORD" "$DB_PASSWORD"
             update_env "MONGO_PASSWORD" "$MONGO_PASSWORD"
             update_env "JWT_SECRET_KEY" "$JWT_SECRET_KEY"
@@ -118,7 +122,7 @@ jobs:
             update_env "LIVEKIT_API_SECRET" "$LIVEKIT_API_SECRET"
             update_env "COOKIE_DOMAIN" "$COOKIE_DOMAIN"
 
-            # Deploy
+            # Deploy Backend
             docker compose pull backend
             docker compose up -d --remove-orphans backend
             docker image prune -f

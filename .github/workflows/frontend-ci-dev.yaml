@@ -8,15 +8,15 @@ on:
   push:
     branches: [ "dev" ]
     paths:
-      - 'video-call-frontend/**' # Chỉ chạy khi sửa code frontend
+      - 'video-call-frontend/**'
       - 'operation/**'
       - '.github/workflows/frontend-ci-dev.yaml'
 
 env:
-  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }} # Dùng Vars như đã cấu hình
+  PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
   REGION: asia-southeast1
   REPO_NAME: video-call-repo
-  IMAGE_NAME: video-call-frontend # ✅ Tên Image Frontend
+  IMAGE_NAME: video-call-frontend
   DEPLOY_PATH: /home/${{ secrets.GCP_VM_USER }}/video-call-web-app/operation/
 
 jobs:
@@ -48,11 +48,10 @@ jobs:
           IMAGE_TAG: ${{ steps.vars.outputs.sha_short }}
         run: |
           FULL_IMAGE="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG}"
-          # ✅ Build từ thư mục frontend
           docker build -t $FULL_IMAGE ./video-call-frontend
           docker push $FULL_IMAGE
 
-      # --- 2. DEPLOY (UPDATE .env THÔNG MINH) ---
+      # --- 2. DEPLOY ---
       - name: Trigger Server Update
         uses: appleboy/ssh-action@v1.0.3
         env:
@@ -69,46 +68,38 @@ jobs:
           port: 22
           envs: IMAGE_TAG,PROJECT_ID,REGION,REPO_NAME,IMAGE_NAME,DEPLOY_PATH
           script: |
-            # 1. Pull code cấu hình mới nhất
-            cd $DEPLOY_PATH/../../
+            # ✅ SỬA 1: Lùi 1 cấp về Git Root
+            cd $DEPLOY_PATH/..
+            
             git fetch origin dev
             git reset --hard origin/dev
             
-            # 2. Vào thư mục deploy
             cd $DEPLOY_PATH
+            touch .env
 
-            # 3. Cập nhật file .env (Không được xóa biến của Backend!)
-            # Tạo file .env nếu chưa có
-            touch .env 
-            
-            # Cập nhật các biến chung (Ghi đè hoặc thêm mới nếu chưa có)
-            # Dùng grep để kiểm tra, nếu chưa có thì thêm, có rồi thì sửa (Logic hơi phức tạp nên ta dùng cách "Xóa rồi Thêm")
-            
-            # Hàm cập nhật biến an toàn
             update_env() {
               key=$1
               val=$2
-              # Xóa dòng cũ chứa key này (nếu có)
               sed -i "/^$key=/d" .env
-              # Thêm dòng mới vào cuối file
               echo "$key=$val" >> .env
             }
 
-            # Cập nhật các biến chung
             update_env "GCP_PROJECT_ID" "$PROJECT_ID"
             update_env "GCP_REGION" "$REGION"
             update_env "GCP_REPO_NAME" "$REPO_NAME"
             
-            # ✅ QUAN TRỌNG: Chỉ cập nhật FRONTEND_TAG
+            # ✅ Cập nhật FRONTEND
             update_env "FRONTEND_TAG" "$IMAGE_TAG"
-            # (Lưu ý: BACKEND_TAG trong file .env sẽ được giữ nguyên)
+            
+            # ✅ SỬA 2: Kiểm tra BACKEND_TAG để tránh lỗi
+            if ! grep -q "BACKEND_TAG=" .env; then
+               echo "BACKEND_TAG=latest" >> .env
+            fi
 
-            echo "--- Content of .env ---"
-            cat .env
+            # echo "--- Content of .env ---"
+            # cat .env
 
-            # 4. Deploy Frontend
-            # Chỉ pull và up service frontend để tiết kiệm thời gian
+            # Deploy Frontend
             docker compose pull frontend
             docker compose up -d --remove-orphans frontend
-            
             docker image prune -f
