@@ -16,8 +16,8 @@ env:
   DOCKER_BUILD_CONTEXT: ./video-call-frontend
 
 jobs:
-  build-and-deploy:
-    name: Build, Push & Deploy
+  pull-and-deploy:
+    name: Pull & Deploy
     runs-on: ubuntu-latest
     permissions:
       contents: 'read'

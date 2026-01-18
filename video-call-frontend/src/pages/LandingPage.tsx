@@ -112,7 +112,7 @@ export default function LandingPage() {
         )}
       </div>
       <div className="landing-card">
-        <h1>Our Meeting App</h1>
+        <h1>Our Meeting App 1</h1>
         <p>Chọn chế độ gọi phù hợp</p>
 
         <div className="action-container">
