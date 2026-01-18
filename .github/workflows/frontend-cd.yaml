@@ -35,24 +35,24 @@ jobs:
       - name: Configure Docker
         run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
 
-      - name: Set Short SHA
-        id: vars
+      - name: Set Image Tag
         run: |
-          echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
-          echo "📦 Building image with tag: $(git rev-parse --short HEAD)"
+          echo "IMAGE_TAG=${GITHUB_SHA}" >> $GITHUB_ENV
 
-      - name: Build Docker Image
-        env:
-          IMAGE_TAG: ${{ steps.vars.outputs.sha_short }}
+      - name: Pull scanned image
         run: |
-          FULL_IMAGE_NAME="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG}"
-          echo "FULL_IMAGE_NAME=$FULL_IMAGE_NAME" >> $GITHUB_ENV
-          docker build -t $FULL_IMAGE_NAME ${{ env.DOCKER_BUILD_CONTEXT }}
+          IMAGE="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG}"
+          echo "IMAGE=$IMAGE" >> $GITHUB_ENV
+          docker pull $IMAGE    
 
-      - name: Push Docker Image
+      - name: Promote image to prod
         run: |
-          echo "🚀 Pushing image: ${{ env.FULL_IMAGE_NAME }}"
-          docker push ${{ env.FULL_IMAGE_NAME }}
+          PROD_IMAGE="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/${{ env.IMAGE_NAME }}:prod-${IMAGE_TAG}"
+          echo "PROD_IMAGE=$PROD_IMAGE" >> $GITHUB_ENV
+          docker tag $IMAGE $PROD_IMAGE        
+
+      - name: Push prod image
+        run: docker push ${{ env.PROD_IMAGE }}
 
       - name: Update GitOps Repo
         env:
@@ -71,7 +71,7 @@ jobs:
           
           sudo wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/bin/yq && sudo chmod +x /usr/bin/yq
           
-          yq -i "select(.kind == \"Deployment\" and .metadata.name == \"frontend\").spec.template.spec.containers[0].image = \"${FULL_IMAGE_NAME}\"" web-app/2-app.yaml
+          yq -i "select(.kind == \"Deployment\" and .metadata.name == \"frontend\").spec.template.spec.containers[0].image = \"${PROD_IMAGE}\"" web-app/2-app.yaml
           
           git add .
           if ! git diff-index --quiet HEAD; then
