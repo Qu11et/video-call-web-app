@@ -57,7 +57,7 @@ jobs:
       - name: Update GitOps Repo
         env:
           GITOPS_TOKEN: ${{ secrets.GITOPS_TOKEN }}
-          IMAGE_TAG: ${{ steps.vars.outputs.sha_short }}
+          IMAGE_TAG: ${IMAGE_TAG}
         run: |
           FULL_IMAGE_NAME="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG}"
           
